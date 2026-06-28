@@ -124,10 +124,17 @@ export default function BracketTree({ bracket }: { bracket: BracketResponse }) {
   const sf = bracket.semi_finals;
   const finalTie = bracket.final[0];
 
-  const half = <T,>(arr: T[]) => [arr.slice(0, Math.ceil(arr.length / 2)), arr.slice(Math.ceil(arr.length / 2))] as const;
-  const [r16L, r16R] = half(r16);
-  const [qfL, qfR] = half(qf);
-  const [sfL, sfR] = half(sf);
+  // Prefer the explicit Left/Right bracket labels; fall back to halves.
+  const split = (arr: BracketFixture[]) => {
+    const left = arr.filter((f) => (f.group_name ?? "").toLowerCase().includes("left"));
+    const right = arr.filter((f) => (f.group_name ?? "").toLowerCase().includes("right"));
+    if (left.length && right.length) return [left, right] as const;
+    const mid = Math.ceil(arr.length / 2);
+    return [arr.slice(0, mid), arr.slice(mid)] as const;
+  };
+  const [r16L, r16R] = split(r16);
+  const [qfL, qfR] = split(qf);
+  const [sfL, sfR] = split(sf);
 
   const championCode = finalTie ? derive(finalTie).homeWins
     ? shortCode(finalTie.home_team_code, finalTie.home_team_name)
