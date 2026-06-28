@@ -1,6 +1,20 @@
 import { Link } from "react-router-dom";
 import { Fixture } from "../types";
 
+function formatKickoff(value?: string) {
+  if (!value) return "Kickoff TBC";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Kickoff TBC";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 export default function MatchCard({ fixture }: { fixture: Fixture }) {
   return (
     <Link
@@ -18,10 +32,10 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
         <span className="text-sm font-semibold text-ink/45">vs</span>
         <p className="text-right text-lg font-bold">{fixture.away_team_name}</p>
       </div>
-      <p className="mt-4 text-sm text-ink/60">
+      <p className="mt-4 text-sm font-semibold text-pitch">{formatKickoff(fixture.kickoff_time)}</p>
+      <p className="mt-1 text-sm text-ink/60">
         {fixture.city} · {fixture.venue}
       </p>
     </Link>
   );
 }
-
