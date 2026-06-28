@@ -91,6 +91,14 @@ Stop containers with:
 make docker-down
 ```
 
+## GitHub Pages Deployment
+
+The frontend can be deployed as a static GitHub Pages site from the `frontend/` app. It uses hash-based routing so deep links keep working on refresh.
+
+Before the workflow runs, set a repository variable named `VITE_API_BASE_URL` to the hosted backend URL you want the Pages site to call. If you skip that variable, the frontend will keep using `http://localhost:9000`, which only works for local development.
+
+After pushing to `main`, the workflow at [.github/workflows/deploy-pages.yml](.github/workflows/deploy-pages.yml) builds `frontend/` and publishes the `dist/` output to Pages.
+
 ## Database
 
 Run migrations:

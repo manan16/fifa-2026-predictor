@@ -19,10 +19,10 @@ function timeAgo(iso?: string | null): string {
 }
 
 const dotColour: Record<SyncPhase, string> = {
-  idle: "text-slate-400",
-  syncing: "text-yellow-300",
-  synced: "text-emerald-300",
-  error: "text-orange-300"
+  idle: "text-chalk-dim",
+  syncing: "text-gold",
+  synced: "text-sky",
+  error: "text-coral"
 };
 
 const label: Record<SyncPhase, string> = {
@@ -44,19 +44,19 @@ export default function SyncIndicator({ status, phase }: Props) {
     <div className="min-w-[220px]">
       <div className="flex items-center gap-2">
         <span className={`live-dot ${dotColour[phase]}`} style={{ backgroundColor: "currentColor" }} />
-        <span className="text-sm font-black uppercase tracking-wide text-white">{label[phase]}</span>
-        <span className="text-xs font-bold text-slate-400">· auto</span>
+        <span className="font-mono text-xs font-bold uppercase tracking-[0.12em] text-chalk">{label[phase]}</span>
+        <span className="font-mono text-[10px] uppercase text-chalk-dim">· auto</span>
       </div>
-      <p className="mt-2 text-sm text-slate-300">
+      <p className="mt-2 text-sm text-chalk-dim">
         {detail}
         {phase !== "syncing" && (
-          <span className="text-slate-400"> · updated {timeAgo(lastTime)}</span>
+          <span className="text-chalk-dim"> · updated {timeAgo(lastTime)}</span>
         )}
       </p>
-      <div className="sync-track mt-3 h-1 w-full overflow-hidden rounded-full bg-white/10">
+      <div className="sync-track mt-3 h-1 w-full overflow-hidden rounded-full bg-chalk-faint">
         {phase !== "syncing" && (
           <div
-            className={`h-full rounded-full ${phase === "error" ? "bg-coral/70" : "bg-grass/70"}`}
+            className={`h-full rounded-full ${phase === "error" ? "bg-coral/70" : "bg-sky/70"}`}
             style={{ width: "100%" }}
           />
         )}
