@@ -21,8 +21,10 @@ export default function Fixtures() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black">Fixtures</h1>
-          <p className="mt-2 text-ink/65">Sample World Cup 2026 fixtures for the MVP predictor.</p>
+          <h1 className="text-3xl font-black">Knockout bracket fixtures</h1>
+          <p className="mt-2 text-ink/65">
+            Demo World Cup 2026 knockout fixtures based on the bracket reference, from Round of 32 to the final.
+          </p>
         </div>
         <select
           value={stage}
@@ -47,4 +49,3 @@ export default function Fixtures() {
     </div>
   );
 }
-
