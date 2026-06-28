@@ -1,14 +1,20 @@
 import { Link } from "react-router-dom";
 import { Fixture } from "../types";
-import FootballPulse from "./FootballPulse";
-import ScoreDisplay from "./ScoreDisplay";
+import CrestPip from "./CrestPip";
+import SupremacyMeter from "./SupremacyMeter";
+import { favouritesDisagree, shortCode, twoWayShare } from "../lib/match";
 
-function formatKickoff(value?: string) {
+function statusKind(status: string): "live" | "done" | "scheduled" {
+  const s = status.toLowerCase();
+  if (["live", "in_play", "playing"].includes(s)) return "live";
+  if (["completed", "finished", "done", "ft", "full_time"].includes(s)) return "done";
+  return "scheduled";
+}
+
+function formatKickoff(value?: string): string {
   if (!value) return "Kickoff TBC";
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Kickoff TBC";
-
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -18,83 +24,88 @@ function formatKickoff(value?: string) {
 }
 
 export default function MatchCard({ fixture }: { fixture: Fixture }) {
-  const homeModel = fixture.home_win_probability ?? 0;
-  const awayModel = fixture.away_win_probability ?? 0;
-  const modelFavourite = homeModel >= awayModel ? fixture.home_team_name : fixture.away_team_name;
-  const modelProbability = Math.max(homeModel, awayModel);
-  const marketFavourite =
-    (fixture.market_home_probability ?? 0) >= (fixture.market_away_probability ?? 0)
-      ? fixture.home_team_name
-      : fixture.away_team_name;
-  const hasStats =
-    fixture.home_shots != null &&
-    fixture.away_shots != null &&
-    fixture.home_possession != null &&
-    fixture.away_possession != null;
+  const homeCode = shortCode(fixture.home_team_code, fixture.home_team_name);
+  const awayCode = shortCode(fixture.away_team_code, fixture.away_team_name);
+  const modelShare = twoWayShare(fixture.home_win_probability, fixture.away_win_probability);
+  const marketShare =
+    fixture.market_home_probability != null || fixture.market_away_probability != null
+      ? twoWayShare(fixture.market_home_probability, fixture.market_away_probability)
+      : null;
+
+  const kind = statusKind(fixture.status);
+  const completed = kind === "done";
+  const homeLead = modelShare >= 0.5;
+
+  const upset = completed
+    ? fixture.actual_winner != null && fixture.predicted_winner != null && fixture.predicted_winner !== fixture.actual_winner
+    : favouritesDisagree(modelShare, marketShare);
+
+  const score = completed
+    ? `${fixture.actual_home_score ?? "–"}–${fixture.actual_away_score ?? "–"}`
+    : fixture.predicted_home_goals != null && fixture.predicted_away_goals != null
+      ? `${fixture.predicted_home_goals}–${fixture.predicted_away_goals}`
+      : "–";
+
+  const dot =
+    kind === "live"
+      ? "live-dot text-coral"
+      : kind === "scheduled"
+        ? "live-dot text-gold"
+        : "inline-block h-2 w-2 rounded-full bg-chalk-faint";
 
   return (
     <Link
       to={`/fixtures/${fixture.id}`}
-      className="group block overflow-hidden border border-white/15 bg-slate-900/85 p-4 text-slate-100 shadow-broadcast transition duration-300 hover:-translate-y-1 hover:border-yellow-300/60 hover:shadow-yellow-500/10"
+      className="group block rounded border border-line bg-turf/45 p-4 transition duration-300 hover:-translate-y-1 hover:border-gold/40 hover:shadow-broadcast focus-visible:-translate-y-1"
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-sm font-bold text-emerald-300">
-          <FootballPulse status={fixture.status} />
-          {fixture.stage}
-        </p>
-        <span className="border border-yellow-300/40 bg-yellow-400/10 px-2 py-1 text-xs font-black text-yellow-300">
-          Match {fixture.match_number}
+      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-chalk-dim">
+        <span className="flex items-center gap-2">
+          <span className={dot} style={{ backgroundColor: "currentColor" }} />
+          <span className="text-gold">{fixture.stage}</span>
         </span>
+        <span>{completed ? "FT" : formatKickoff(fixture.kickoff_time)}</span>
       </div>
+
       <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <p className="text-lg font-black text-white">{fixture.home_team_name}</p>
-        <span className="rounded-full border border-white/40 px-2 py-1 text-xs font-black text-white">vs</span>
-        <p className="text-right text-lg font-black text-white">{fixture.away_team_name}</p>
-      </div>
-      <div className="mt-4 bg-stadium/45 p-3">
-        <ScoreDisplay
-          homeTeam={fixture.home_team_name}
-          awayTeam={fixture.away_team_name}
-          predictedHome={fixture.predicted_home_goals}
-          predictedAway={fixture.predicted_away_goals}
-          actualHome={fixture.actual_home_score}
-          actualAway={fixture.actual_away_score}
-          homePenalties={fixture.home_penalties}
-          awayPenalties={fixture.away_penalties}
-          actualWinner={fixture.actual_winner}
-          status={fixture.status}
-        />
-      </div>
-      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-        <div className="bg-white/10 p-2">
-          <p className="text-slate-400">Model favourite</p>
-          <p className="font-black text-white">{modelProbability ? `${modelFavourite} ${Math.round(modelProbability * 100)}%` : "Prediction loading"}</p>
+        <div className="flex items-center gap-2.5">
+          <CrestPip code={homeCode} variant={homeLead ? "gold" : "default"} />
+          <span className={`font-display text-lg font-bold uppercase leading-none ${homeLead ? "text-gold" : "text-chalk"}`}>
+            {homeCode}
+          </span>
         </div>
-        <div className="bg-white/10 p-2">
-          <p className="text-slate-400">Market favours</p>
-          <p className="font-black text-blue-300">{fixture.market_home_probability || fixture.market_away_probability ? marketFavourite : "Market loading"}</p>
+        <span className="font-display text-2xl font-extrabold tracking-wide text-chalk font-tabular">{score}</span>
+        <div className="flex items-center justify-end gap-2.5">
+          <span className={`font-display text-lg font-bold uppercase leading-none ${!homeLead ? "text-gold" : "text-chalk"}`}>
+            {awayCode}
+          </span>
+          <CrestPip code={awayCode} variant={!homeLead ? "gold" : "default"} />
         </div>
       </div>
-      {hasStats && (
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/10 pt-3 text-xs">
-          <div>
-            <p className="text-slate-400">Shots</p>
-            <p className="font-black text-white">{fixture.home_shots}-{fixture.away_shots}</p>
-          </div>
-          <div>
-            <p className="text-slate-400">SOT</p>
-            <p className="font-black text-white">{fixture.home_shots_on_target}-{fixture.away_shots_on_target}</p>
-          </div>
-          <div>
-            <p className="text-slate-400">Poss</p>
-            <p className="font-black text-white">{fixture.home_possession}%/{fixture.away_possession}%</p>
-          </div>
-        </div>
-      )}
-      <p className="mt-4 text-sm font-bold text-yellow-300">{formatKickoff(fixture.kickoff_time)}</p>
-      <p className="mt-1 text-sm text-slate-300">
-        {fixture.city} · {fixture.venue}
-      </p>
+
+      <SupremacyMeter
+        size="mini"
+        className="mt-4"
+        homeCode={homeCode}
+        awayCode={awayCode}
+        modelProb={modelShare}
+        marketProb={marketShare}
+      />
+
+      <div className="mt-3 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.08em] text-chalk-dim">
+        <span>
+          desk <span className="font-bold text-gold">{Math.round(modelShare * 100)}%</span>
+          {marketShare != null && (
+            <>
+              {" "}· mkt <span className="font-bold text-sky">{Math.round(marketShare * 100)}%</span>
+            </>
+          )}
+        </span>
+        {upset ? (
+          <span className="text-coral">{completed ? "result beat the desk" : "market disagrees"}</span>
+        ) : (
+          fixture.confidence && <span>conf {fixture.confidence}</span>
+        )}
+      </div>
     </Link>
   );
 }

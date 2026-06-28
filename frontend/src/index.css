@@ -4,11 +4,15 @@
 
 body {
   margin: 0;
-  background: #07111f;
-  color: #f8fafc;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  min-height: 100vh;
+  color: #ecf4ed;
+  font-family: "Saira", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(120% 70% at 82% -8%, rgba(244, 196, 48, 0.12), transparent 58%),
+    radial-gradient(90% 55% at 6% 2%, rgba(110, 194, 255, 0.07), transparent 52%),
+    linear-gradient(180deg, #102a1e, #0a1a14 55%);
+  background-attachment: fixed;
 }
 
 a,
@@ -18,8 +22,14 @@ button {
 
 a:focus-visible,
 button:focus-visible,
-select:focus-visible {
-  outline: 2px solid #facc15;
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #f4c430;
+  outline-offset: 3px;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes page-in {
@@ -269,6 +279,100 @@ select:focus-visible {
   animation: skeleton-sweep 1.4s ease-in-out infinite;
 }
 
+/* --- Matchnight additions -------------------------------------------------- */
+
+/* Chalk lines that draw themselves in (stroke-dashoffset). Elements opt in by
+   setting their own stroke-dasharray inline so the dash length matches. */
+@keyframes chalk-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-chalk-draw {
+  animation: chalk-draw 1.1s ease-out both;
+}
+
+/* The champion crest igniting last in a funnel / bracket. */
+@keyframes ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow:
+      0 0 0 8px rgba(244, 196, 48, 0.12),
+      0 14px 40px rgba(244, 196, 48, 0.3);
+  }
+}
+
+.animate-ignite {
+  animation: ignite 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Seamless broadcast marquee. Track is duplicated, so -50% loops cleanly. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 26s linear infinite;
+}
+
+/* Drifting floodlight glow. */
+@keyframes flood {
+  from {
+    transform: translateX(-7%);
+    opacity: 0.65;
+  }
+  to {
+    transform: translateX(9%);
+    opacity: 1;
+  }
+}
+
+.animate-flood {
+  animation: flood 16s ease-in-out infinite alternate;
+}
+
+/* Tie / row entrance used across bracket, fixtures and teams boards. */
+@keyframes tie-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-tie-pop {
+  animation: tie-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Fade a market tick / overlay in after the bar has filled. */
+@keyframes soft-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-soft-fade {
+  animation: soft-fade 0.4s ease both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -277,5 +381,14 @@ select:focus-visible {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
+  }
+
+  /* Resolve drawn-in chalk lines and marquees to their final state. */
+  [data-chalk] {
+    stroke-dashoffset: 0 !important;
+  }
+
+  .animate-marquee {
+    animation: none !important;
   }
 }
