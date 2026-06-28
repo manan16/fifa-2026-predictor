@@ -62,7 +62,7 @@ In another terminal:
 make frontend
 ```
 
-Open `http://localhost:5173`. The backend runs at `http://localhost:5000`.
+Open `http://localhost:5173`. The backend runs at `http://localhost:9000`.
 
 ## Local Setup With Docker
 
@@ -74,7 +74,7 @@ make docker-up
 Docker starts PostgreSQL, runs migrations and seed data, then serves:
 
 - Frontend: `http://localhost:5173`
-- Backend: `http://localhost:5000`
+- Backend: `http://localhost:9000`
 - PostgreSQL: `localhost:5432`
 
 Stop containers with:
@@ -115,7 +115,7 @@ POST /api/predict
 Example custom prediction:
 
 ```bash
-curl -X POST http://localhost:5000/api/predict \
+curl -X POST http://localhost:9000/api/predict \
   -H "Content-Type: application/json" \
   -d '{"home_team":"Brazil","away_team":"Japan","neutral_venue":true,"stage":"Round of 32"}'
 ```
