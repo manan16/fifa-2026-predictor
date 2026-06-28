@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 
 const links = [
   { to: "/", label: "Dashboard" },
-  { to: "/fixtures", label: "Fixtures" },
+  { to: "/fixtures", label: "Knockout fixtures" },
   { to: "/teams", label: "Teams" },
   { to: "/model", label: "Model" }
 ];
@@ -12,7 +12,7 @@ export default function Navbar() {
     <header className="border-b border-ink/10 bg-white">
       <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <NavLink to="/" className="text-xl font-bold tracking-normal text-pitch">
-          FIFA 2026 Match Predictor
+          FIFA 2026 Knockout Predictor
         </NavLink>
         <div className="flex flex-wrap gap-2">
           {links.map((link) => (
@@ -33,4 +33,3 @@ export default function Navbar() {
     </header>
   );
 }
-
