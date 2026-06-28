@@ -34,19 +34,19 @@ export default function Home() {
     <div className="space-y-8">
       <section className="grid gap-6 md:grid-cols-[1.5fr_1fr] md:items-end">
         <div>
-          <p className="text-sm font-bold uppercase tracking-normal text-coral">World Cup 2026 analytics</p>
+          <p className="text-sm font-bold uppercase tracking-normal text-coral">World Cup 2026 knockout analytics</p>
           <h1 className="mt-3 text-4xl font-black tracking-normal sm:text-5xl">
-            Match probabilities from team strength, form signals, and context.
+            Predict the full knockout bracket from Round of 32 to the final.
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-ink/70">
-            Explore seeded sample fixtures, compare Elo-style baselines, and inspect why the MVP model leans toward each result.
+            Explore the demo bracket fixtures, compare Elo-style win probabilities, and inspect why the MVP model leans toward each knockout pick.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {[
-            ["Teams", "16"],
-            ["Fixtures", "8"],
-            ["Model", "v1"]
+            ["Teams", "32"],
+            ["Fixtures", "31"],
+            ["Bracket", "v1"]
           ].map(([label, value]) => (
             <div key={label} className="bg-white p-4 text-center shadow-sm">
               <p className="text-2xl font-black text-pitch">{value}</p>
@@ -60,9 +60,9 @@ export default function Home() {
 
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Upcoming Matches</h2>
+          <h2 className="text-2xl font-bold">Opening knockout ties</h2>
           <Link to="/fixtures" className="font-semibold text-pitch">
-            View all
+            View bracket fixtures
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -76,12 +76,12 @@ export default function Home() {
         {favourites.map((prediction) => {
           const favourite =
             prediction.home_win_probability >= prediction.away_win_probability
-              ? prediction.home_team
-              : prediction.away_team;
+              ? prediction.home_team || prediction.home_team_name
+              : prediction.away_team || prediction.away_team_name;
           const probability = Math.max(prediction.home_win_probability, prediction.away_win_probability);
           return (
             <div key={`${prediction.fixture_id}-${favourite}`} className="bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-ink/60">Top favourite</p>
+              <p className="text-sm font-semibold text-ink/60">Strongest knockout favourite</p>
               <p className="mt-2 text-xl font-bold">{favourite}</p>
               <p className="mt-3 text-3xl font-black text-pitch">{Math.round(probability * 100)}%</p>
             </div>
@@ -91,7 +91,7 @@ export default function Home() {
 
       <section className="grid gap-4 md:grid-cols-3">
         {[
-          ["/fixtures", "Fixtures", "Browse matches and open prediction detail pages."],
+          ["/fixtures", "Knockout fixtures", "Browse the demo bracket from Round of 32 through the final."],
           ["/teams", "Teams", "Compare ranking, confederation, and Elo rating inputs."],
           ["/model", "Model info", "Understand assumptions, limitations, and roadmap."]
         ].map(([to, title, text]) => (
@@ -104,4 +104,3 @@ export default function Home() {
     </div>
   );
 }
-
