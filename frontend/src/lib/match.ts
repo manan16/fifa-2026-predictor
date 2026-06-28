@@ -12,6 +12,16 @@ export function twoWayShare(home?: number | null, away?: number | null): number 
   return total > 0 ? h / total : 0.5;
 }
 
+export type StatusKind = "live" | "done" | "scheduled";
+
+/** Coarse status bucket driving the desk's status dot. */
+export function statusKind(status: string): StatusKind {
+  const s = (status ?? "").toLowerCase();
+  if (["live", "in_play", "playing"].includes(s)) return "live";
+  if (["completed", "finished", "done", "ft", "full_time"].includes(s)) return "done";
+  return "scheduled";
+}
+
 /** Is the favourite from one set of probabilities different from the other? */
 export function favouritesDisagree(
   modelHome: number | undefined | null,

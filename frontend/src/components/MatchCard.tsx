@@ -2,14 +2,7 @@ import { Link } from "react-router-dom";
 import { Fixture } from "../types";
 import CrestPip from "./CrestPip";
 import SupremacyMeter from "./SupremacyMeter";
-import { favouritesDisagree, shortCode, twoWayShare } from "../lib/match";
-
-function statusKind(status: string): "live" | "done" | "scheduled" {
-  const s = status.toLowerCase();
-  if (["live", "in_play", "playing"].includes(s)) return "live";
-  if (["completed", "finished", "done", "ft", "full_time"].includes(s)) return "done";
-  return "scheduled";
-}
+import { favouritesDisagree, shortCode, statusKind, twoWayShare } from "../lib/match";
 
 function formatKickoff(value?: string): string {
   if (!value) return "Kickoff TBC";
