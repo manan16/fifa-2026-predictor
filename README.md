@@ -1,8 +1,8 @@
-# FIFA 2026 Match Predictor
+# FIFA 2026 Knockout Predictor
 
 ![Screenshot placeholder](docs/screenshot-placeholder.svg)
 
-Portfolio-quality MVP for predicting FIFA World Cup 2026 match outcomes with a Flask API, PostgreSQL, raw SQL migrations, psycopg 3, and a React analytics dashboard.
+Portfolio-quality MVP for predicting FIFA World Cup 2026 knockout-stage outcomes with a Flask API, PostgreSQL, raw SQL migrations, psycopg 3, and a React analytics dashboard.
 
 ## Tech Stack
 
@@ -15,7 +15,7 @@ Portfolio-quality MVP for predicting FIFA World Cup 2026 match outcomes with a F
 
 - Team and fixture APIs backed by PostgreSQL
 - Raw SQL migration runner with `schema_migrations`
-- Idempotent seed script with 16 sample teams and 8 sample fixtures
+- Idempotent seed script with 32 knockout teams and 31 demo bracket fixtures
 - Elo-inspired baseline model with Poisson-style scoreline projection
 - 90-minute win/draw/loss probabilities
 - Knockout advance probabilities for non-group matches
@@ -91,7 +91,7 @@ Run migrations:
 cd backend && python -m app.db.migrate
 ```
 
-Seed sample data:
+Seed demo knockout bracket data:
 
 ```bash
 cd backend && python -m app.db.seed
@@ -117,7 +117,7 @@ Example custom prediction:
 ```bash
 curl -X POST http://localhost:5000/api/predict \
   -H "Content-Type: application/json" \
-  -d '{"home_team":"Brazil","away_team":"Japan","neutral_venue":true,"stage":"group"}'
+  -d '{"home_team":"Brazil","away_team":"Japan","neutral_venue":true,"stage":"Round of 32"}'
 ```
 
 ## Prediction Model
@@ -143,6 +143,7 @@ The initial tests cover health, teams, fixtures, prediction routes, probability 
 
 ## Roadmap
 
+- Visual bracket simulator page
 - Live API-Football integration
 - Official FIFA fixture ingestion
 - Historical international match ingestion
@@ -160,7 +161,8 @@ The initial tests cover health, teams, fixtures, prediction routes, probability 
 
 ## Known Limitations
 
-- Fixture dates and groups are sample placeholders.
+- Knockout fixtures are demo data based on the reference bracket image, not an official FIFA feed.
+- Kickoff times are stored as London-local demo timestamps.
 - Seeded team ratings are realistic but illustrative.
 - No live official FIFA feed is connected yet.
 - The model does not account for injuries, squad selection, travel, rest, weather, or tactical style.
