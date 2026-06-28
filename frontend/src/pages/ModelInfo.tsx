@@ -1,3 +1,5 @@
+import AnimatedPage from "../components/AnimatedPage";
+
 export default function ModelInfo() {
   const sections = [
     {
@@ -19,28 +21,28 @@ export default function ModelInfo() {
   ];
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black">Model Info</h1>
-        <p className="mt-2 max-w-3xl text-ink/65">
+        <p className="text-sm font-black uppercase text-gold">Prediction engine</p>
+        <h1 className="mt-2 text-3xl font-black text-line">Model Info</h1>
+        <p className="mt-2 max-w-3xl text-line/65">
           A deliberately simple baseline designed to be transparent, testable, and easy to replace with a trained model later.
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {sections.map((section) => (
-          <div key={section.title} className="bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-bold text-pitch">{section.title}</h2>
-            <p className="mt-3 text-ink/70">{section.body}</p>
+          <div key={section.title} className="border border-line/10 bg-line/[0.06] p-5 shadow-broadcast">
+            <h2 className="text-xl font-black text-gold">{section.title}</h2>
+            <p className="mt-3 text-line/70">{section.body}</p>
           </div>
         ))}
       </div>
-      <div className="bg-ink p-5 text-white shadow-sm">
-        <h2 className="text-xl font-bold">Future improvements</h2>
-        <p className="mt-3 text-white/75">
+      <div className="border border-gold/25 bg-pitch p-5 text-line shadow-broadcast">
+        <h2 className="text-xl font-black">Future improvements</h2>
+        <p className="mt-3 text-line/75">
           Official fixture ingestion, historical international match pipelines, player availability, xG-based features, Brier score evaluation, and Monte Carlo bracket simulation.
         </p>
       </div>
-    </div>
+    </AnimatedPage>
   );
 }
-

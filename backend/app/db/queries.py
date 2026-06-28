@@ -3,6 +3,14 @@ from typing import Any
 from app.db.connection import get_connection, get_dict_cursor
 from psycopg.types.json import Jsonb
 
+KNOCKOUT_STAGES = (
+    "Round of 32",
+    "Round of 16",
+    "Quarter-final",
+    "Semi-final",
+    "Final",
+)
+
 
 def get_all_teams() -> list[dict[str, Any]]:
     with get_dict_cursor() as cur:
@@ -27,7 +35,24 @@ def get_all_fixtures() -> list[dict[str, Any]]:
         cur.execute(
             """
             SELECT
-                f.*,
+                f.id,
+                f.match_number,
+                f.stage,
+                f.group_name,
+                f.home_team_id,
+                f.away_team_id,
+                f.venue,
+                f.city,
+                to_char(f.kickoff_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS kickoff_time,
+                f.status,
+                COALESCE(f.actual_home_score, f.home_score) AS actual_home_score,
+                COALESCE(f.actual_away_score, f.away_score) AS actual_away_score,
+                f.home_penalties,
+                f.away_penalties,
+                f.winner_team_id,
+                wt.name AS actual_winner,
+                f.last_odds_sync,
+                f.last_result_sync,
                 ht.name AS home_team_name,
                 ht.fifa_code AS home_team_code,
                 ht.elo_rating AS home_team_elo,
@@ -37,6 +62,7 @@ def get_all_fixtures() -> list[dict[str, Any]]:
             FROM fixtures f
             LEFT JOIN teams ht ON f.home_team_id = ht.id
             LEFT JOIN teams at ON f.away_team_id = at.id
+            LEFT JOIN teams wt ON f.winner_team_id = wt.id
             ORDER BY f.kickoff_time, f.match_number;
             """
         )
@@ -47,8 +73,59 @@ def get_fixture_by_id(fixture_id: int) -> dict[str, Any] | None:
     with get_dict_cursor() as cur:
         cur.execute(
             """
+            WITH latest_predictions AS (
+                SELECT DISTINCT ON (fixture_id)
+                    fixture_id,
+                    home_win_probability::float AS home_win_probability,
+                    draw_probability::float AS draw_probability,
+                    away_win_probability::float AS away_win_probability,
+                    predicted_home_goals,
+                    predicted_away_goals,
+                    confidence,
+                    created_at
+                FROM predictions
+                WHERE fixture_id = %s
+                ORDER BY fixture_id, created_at DESC, id DESC
+            ),
+            latest_consensus AS (
+                SELECT DISTINCT ON (fixture_id, market_key)
+                    fixture_id,
+                    market_key,
+                    home_probability::float AS market_home_probability,
+                    draw_probability::float AS market_draw_probability,
+                    away_probability::float AS market_away_probability,
+                    bookmaker_count,
+                    average_home_odds::float AS average_home_odds,
+                    average_draw_odds::float AS average_draw_odds,
+                    average_away_odds::float AS average_away_odds,
+                    best_home_odds::float AS best_home_odds,
+                    best_draw_odds::float AS best_draw_odds,
+                    best_away_odds::float AS best_away_odds,
+                    source AS odds_source,
+                    calculated_at
+                FROM odds_consensus
+                WHERE fixture_id = %s AND market_key = 'h2h'
+                ORDER BY fixture_id, market_key, calculated_at DESC, id DESC
+            )
             SELECT
-                f.*,
+                f.id,
+                f.match_number,
+                f.stage,
+                f.group_name,
+                f.home_team_id,
+                f.away_team_id,
+                f.venue,
+                f.city,
+                to_char(f.kickoff_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS kickoff_time,
+                f.status,
+                COALESCE(f.actual_home_score, f.home_score) AS actual_home_score,
+                COALESCE(f.actual_away_score, f.away_score) AS actual_away_score,
+                f.home_penalties,
+                f.away_penalties,
+                f.winner_team_id,
+                wt.name AS actual_winner,
+                f.last_odds_sync,
+                f.last_result_sync,
                 ht.name AS home_team_name,
                 ht.fifa_code AS home_team_code,
                 ht.fifa_ranking AS home_team_ranking,
@@ -56,13 +133,33 @@ def get_fixture_by_id(fixture_id: int) -> dict[str, Any] | None:
                 at.name AS away_team_name,
                 at.fifa_code AS away_team_code,
                 at.fifa_ranking AS away_team_ranking,
-                at.elo_rating AS away_team_elo
+                at.elo_rating AS away_team_elo,
+                lp.predicted_home_goals,
+                lp.predicted_away_goals,
+                lp.confidence,
+                lp.home_win_probability,
+                lp.draw_probability,
+                lp.away_win_probability,
+                lc.market_home_probability,
+                lc.market_draw_probability,
+                lc.market_away_probability,
+                lc.average_home_odds,
+                lc.average_draw_odds,
+                lc.average_away_odds,
+                lc.best_home_odds,
+                lc.best_draw_odds,
+                lc.best_away_odds,
+                lc.bookmaker_count,
+                lc.calculated_at AS odds_calculated_at
             FROM fixtures f
             LEFT JOIN teams ht ON f.home_team_id = ht.id
             LEFT JOIN teams at ON f.away_team_id = at.id
+            LEFT JOIN teams wt ON f.winner_team_id = wt.id
+            LEFT JOIN latest_predictions lp ON lp.fixture_id = f.id
+            LEFT JOIN latest_consensus lc ON lc.fixture_id = f.id
             WHERE f.id = %s;
             """,
-            (fixture_id,),
+            (fixture_id, fixture_id, fixture_id),
         )
         return cur.fetchone()
 
@@ -126,6 +223,247 @@ def get_prediction_by_fixture_id(fixture_id: int) -> dict[str, Any] | None:
             (fixture_id,),
         )
         return cur.fetchone()
+
+
+def get_bracket_fixtures() -> list[dict[str, Any]]:
+    return get_bracket_fixtures_with_odds_results()
+
+
+def get_bracket_fixtures_with_odds_results() -> list[dict[str, Any]]:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            WITH latest_predictions AS (
+                SELECT DISTINCT ON (fixture_id)
+                    fixture_id,
+                    home_win_probability::float AS home_win_probability,
+                    draw_probability::float AS draw_probability,
+                    away_win_probability::float AS away_win_probability,
+                    predicted_home_goals,
+                    predicted_away_goals,
+                    confidence,
+                    created_at
+                FROM predictions
+                ORDER BY fixture_id, created_at DESC, id DESC
+            ),
+            latest_consensus AS (
+                SELECT DISTINCT ON (fixture_id, market_key)
+                    fixture_id,
+                    market_key,
+                    home_probability::float AS market_home_probability,
+                    draw_probability::float AS market_draw_probability,
+                    away_probability::float AS market_away_probability,
+                    bookmaker_count,
+                    average_home_odds::float AS average_home_odds,
+                    average_draw_odds::float AS average_draw_odds,
+                    average_away_odds::float AS average_away_odds,
+                    best_home_odds::float AS best_home_odds,
+                    best_draw_odds::float AS best_draw_odds,
+                    best_away_odds::float AS best_away_odds,
+                    source AS odds_source,
+                    calculated_at
+                FROM odds_consensus
+                WHERE market_key = 'h2h'
+                ORDER BY fixture_id, market_key, calculated_at DESC, id DESC
+            )
+            SELECT
+                f.id,
+                f.match_number,
+                f.stage,
+                f.group_name,
+                f.status,
+                COALESCE(f.actual_home_score, f.home_score) AS actual_home_score,
+                COALESCE(f.actual_away_score, f.away_score) AS actual_away_score,
+                f.home_penalties,
+                f.away_penalties,
+                f.winner_team_id,
+                wt.name AS actual_winner,
+                f.last_odds_sync,
+                f.last_result_sync,
+                ht.name AS home_team_name,
+                at.name AS away_team_name,
+                ht.fifa_code AS home_team_code,
+                at.fifa_code AS away_team_code,
+                to_char(f.kickoff_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS kickoff_time,
+                lp.home_win_probability,
+                lp.draw_probability,
+                lp.away_win_probability,
+                CASE
+                    WHEN lp.home_win_probability IS NULL
+                        OR lp.away_win_probability IS NULL
+                        OR COALESCE(lp.home_win_probability + lp.away_win_probability, 0) = 0
+                    THEN NULL
+                    ELSE (
+                        lp.home_win_probability
+                        + COALESCE(lp.draw_probability, 0)
+                        * (lp.home_win_probability / (lp.home_win_probability + lp.away_win_probability))
+                    )::float
+                END AS home_advance_probability,
+                CASE
+                    WHEN lp.home_win_probability IS NULL
+                        OR lp.away_win_probability IS NULL
+                        OR COALESCE(lp.home_win_probability + lp.away_win_probability, 0) = 0
+                    THEN NULL
+                    ELSE (
+                        lp.away_win_probability
+                        + COALESCE(lp.draw_probability, 0)
+                        * (lp.away_win_probability / (lp.home_win_probability + lp.away_win_probability))
+                    )::float
+                END AS away_advance_probability,
+                lp.predicted_home_goals,
+                lp.predicted_away_goals,
+                lp.confidence,
+                lc.market_home_probability,
+                lc.market_draw_probability,
+                lc.market_away_probability,
+                lc.average_home_odds,
+                lc.average_draw_odds,
+                lc.average_away_odds,
+                lc.best_home_odds,
+                lc.best_draw_odds,
+                lc.best_away_odds,
+                lc.bookmaker_count,
+                lc.calculated_at AS odds_calculated_at
+            FROM fixtures f
+            JOIN teams ht ON f.home_team_id = ht.id
+            JOIN teams at ON f.away_team_id = at.id
+            LEFT JOIN teams wt ON f.winner_team_id = wt.id
+            LEFT JOIN latest_predictions lp ON lp.fixture_id = f.id
+            LEFT JOIN latest_consensus lc ON lc.fixture_id = f.id
+            WHERE f.stage = ANY(%s)
+            ORDER BY
+                CASE f.stage
+                    WHEN 'Round of 32' THEN 1
+                    WHEN 'Round of 16' THEN 2
+                    WHEN 'Quarter-final' THEN 3
+                    WHEN 'Semi-final' THEN 4
+                    WHEN 'Final' THEN 5
+                    ELSE 99
+                END,
+                f.match_number;
+            """,
+            (list(KNOCKOUT_STAGES),),
+        )
+        return list(cur.fetchall())
+
+
+def get_fixture_odds(fixture_id: int) -> list[dict[str, Any]]:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            WITH latest_odds AS (
+                SELECT DISTINCT ON (fo.bookmaker_id, fo.outcome_type)
+                    fo.*,
+                    b.name AS bookmaker,
+                    b.region
+                FROM fixture_odds fo
+                JOIN bookmakers b ON fo.bookmaker_id = b.id
+                WHERE fo.fixture_id = %s AND fo.market_key = 'h2h'
+                ORDER BY fo.bookmaker_id, fo.outcome_type, fo.fetched_at DESC, fo.id DESC
+            )
+            SELECT
+                bookmaker,
+                region,
+                market_key,
+                outcome_name,
+                outcome_type,
+                decimal_price::float AS decimal_price,
+                implied_probability::float AS implied_probability,
+                normalized_probability::float AS normalized_probability,
+                last_update,
+                fetched_at,
+                source
+            FROM latest_odds
+            ORDER BY bookmaker, outcome_type;
+            """,
+            (fixture_id,),
+        )
+        return list(cur.fetchall())
+
+
+def get_odds_consensus_by_fixture_id(fixture_id: int) -> dict[str, Any] | None:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                fixture_id,
+                market_key,
+                home_probability::float AS home_probability,
+                draw_probability::float AS draw_probability,
+                away_probability::float AS away_probability,
+                bookmaker_count,
+                average_home_odds::float AS average_home_odds,
+                average_draw_odds::float AS average_draw_odds,
+                average_away_odds::float AS average_away_odds,
+                best_home_odds::float AS best_home_odds,
+                best_draw_odds::float AS best_draw_odds,
+                best_away_odds::float AS best_away_odds,
+                source,
+                calculated_at
+            FROM odds_consensus
+            WHERE fixture_id = %s AND market_key = 'h2h'
+            ORDER BY calculated_at DESC, id DESC
+            LIMIT 1;
+            """,
+            (fixture_id,),
+        )
+        return cur.fetchone()
+
+
+def get_latest_odds() -> list[dict[str, Any]]:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            WITH latest_consensus AS (
+                SELECT DISTINCT ON (fixture_id, market_key)
+                    *
+                FROM odds_consensus
+                WHERE market_key = 'h2h'
+                ORDER BY fixture_id, market_key, calculated_at DESC, id DESC
+            )
+            SELECT
+                lc.fixture_id,
+                f.match_number,
+                f.stage,
+                ht.name AS home_team_name,
+                at.name AS away_team_name,
+                lc.home_probability::float AS market_home_probability,
+                lc.draw_probability::float AS market_draw_probability,
+                lc.away_probability::float AS market_away_probability,
+                lc.average_home_odds::float AS average_home_odds,
+                lc.average_draw_odds::float AS average_draw_odds,
+                lc.average_away_odds::float AS average_away_odds,
+                lc.best_home_odds::float AS best_home_odds,
+                lc.best_draw_odds::float AS best_draw_odds,
+                lc.best_away_odds::float AS best_away_odds,
+                lc.bookmaker_count,
+                lc.source,
+                lc.calculated_at
+            FROM latest_consensus lc
+            JOIN fixtures f ON lc.fixture_id = f.id
+            JOIN teams ht ON f.home_team_id = ht.id
+            JOIN teams at ON f.away_team_id = at.id
+            ORDER BY f.match_number;
+            """
+        )
+        return list(cur.fetchall())
+
+
+def get_latest_sync_runs(limit: int = 10) -> list[dict[str, Any]]:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            SELECT * FROM sync_runs
+            ORDER BY started_at DESC, id DESC
+            LIMIT %s;
+            """,
+            (limit,),
+        )
+        return list(cur.fetchall())
+
+
+def get_fixture_with_prediction_odds_and_result(fixture_id: int) -> dict[str, Any] | None:
+    return get_fixture_by_id(fixture_id)
 
 
 def insert_prediction(prediction_data: dict[str, Any]) -> dict[str, Any]:

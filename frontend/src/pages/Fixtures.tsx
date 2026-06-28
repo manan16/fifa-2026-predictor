@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import AnimatedPage from "../components/AnimatedPage";
 import MatchCard from "../components/MatchCard";
 import { getFixtures } from "../services/api";
 import { Fixture } from "../types";
@@ -18,25 +19,29 @@ export default function Fixtures() {
   const filtered = stage === "All" ? fixtures : fixtures.filter((fixture) => fixture.stage === stage);
 
   return (
-    <div className="space-y-6">
+    <AnimatedPage className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black">Knockout bracket fixtures</h1>
-          <p className="mt-2 text-ink/65">
+          <p className="text-sm font-black uppercase text-gold">Matchday board</p>
+          <h1 className="mt-2 text-3xl font-black text-line">Knockout bracket fixtures</h1>
+          <p className="mt-2 text-line/65">
             Demo World Cup 2026 knockout fixtures based on the bracket reference, from Round of 32 to the final.
           </p>
         </div>
-        <select
-          value={stage}
-          onChange={(event) => setStage(event.target.value)}
-          className="border border-ink/15 bg-white px-3 py-2"
-        >
+        <div className="flex flex-wrap gap-2">
           {stages.map((item) => (
-            <option key={item} value={item}>
+            <button
+              key={item}
+              type="button"
+              onClick={() => setStage(item)}
+              className={`border px-3 py-2 text-sm font-black transition ${
+                stage === item ? "border-gold bg-gold text-stadium" : "border-line/15 bg-line/10 text-line/70 hover:border-gold/60"
+              }`}
+            >
               {item}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
       {error && <div className="border border-coral/30 bg-coral/10 p-4 text-coral">{error}</div>}
@@ -46,6 +51,6 @@ export default function Fixtures() {
           <MatchCard key={fixture.id} fixture={fixture} />
         ))}
       </div>
-    </div>
+    </AnimatedPage>
   );
 }

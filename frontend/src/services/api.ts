@@ -1,4 +1,12 @@
-import { Fixture, PredictPayload, Prediction, Team } from "../types";
+import {
+  BracketResponse,
+  Fixture,
+  FixtureOddsResponse,
+  PredictPayload,
+  Prediction,
+  SyncStatus,
+  Team
+} from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:9000";
 
@@ -28,6 +36,11 @@ export const getTeams = () => request<Team[]>("/api/teams");
 export const getTeam = (id: number) => request<Team>(`/api/teams/${id}`);
 export const getFixtures = () => request<Fixture[]>("/api/fixtures");
 export const getFixture = (id: number) => request<Fixture>(`/api/fixtures/${id}`);
+export const getFixtureOdds = (id: number) => request<FixtureOddsResponse>(`/api/fixtures/${id}/odds`);
+export const getBracket = () => request<BracketResponse>("/api/bracket");
+export const getOdds = () => request<unknown[]>("/api/odds");
+export const getSyncStatus = () => request<SyncStatus>("/api/sync/status");
+export const runManualSync = () => request<unknown>("/api/sync/run", { method: "POST" });
 export const getPredictions = async () => {
   const predictions = await request<Prediction[]>("/api/predictions");
   return predictions.map(normalizePrediction);
@@ -41,4 +54,3 @@ export const predictCustomMatch = (payload: PredictPayload) =>
     method: "POST",
     body: JSON.stringify(payload)
   });
-

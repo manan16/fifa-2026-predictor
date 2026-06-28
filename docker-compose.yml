@@ -22,6 +22,15 @@ services:
       FLASK_ENV: development
       FLASK_DEBUG: 1
       DATABASE_URL: postgresql://fifa_user:fifa_password@postgres:5432/fifa_predictor
+      ODDS_API_KEY: ${ODDS_API_KEY:-}
+      ODDS_API_BASE_URL: ${ODDS_API_BASE_URL:-https://api.the-odds-api.com/v4}
+      ODDS_API_SPORT_KEY: ${ODDS_API_SPORT_KEY:-soccer_fifa_world_cup}
+      ODDS_API_REGIONS: ${ODDS_API_REGIONS:-uk,eu,us}
+      ODDS_API_MARKETS: ${ODDS_API_MARKETS:-h2h}
+      RESULTS_API_KEY: ${RESULTS_API_KEY:-}
+      RESULTS_API_BASE_URL: ${RESULTS_API_BASE_URL:-}
+      ENABLE_AUTO_SYNC: ${ENABLE_AUTO_SYNC:-false}
+      SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-15}
     ports:
       - "9000:9000"
     volumes:
@@ -44,6 +53,28 @@ services:
     depends_on:
       - backend
 
+  sync-worker:
+    build:
+      context: ./backend
+    profiles:
+      - sync
+    environment:
+      DATABASE_URL: postgresql://fifa_user:fifa_password@postgres:5432/fifa_predictor
+      ODDS_API_KEY: ${ODDS_API_KEY:-}
+      ODDS_API_BASE_URL: ${ODDS_API_BASE_URL:-https://api.the-odds-api.com/v4}
+      ODDS_API_SPORT_KEY: ${ODDS_API_SPORT_KEY:-soccer_fifa_world_cup}
+      ODDS_API_REGIONS: ${ODDS_API_REGIONS:-uk,eu,us}
+      ODDS_API_MARKETS: ${ODDS_API_MARKETS:-h2h}
+      RESULTS_API_KEY: ${RESULTS_API_KEY:-}
+      RESULTS_API_BASE_URL: ${RESULTS_API_BASE_URL:-}
+      ENABLE_AUTO_SYNC: ${ENABLE_AUTO_SYNC:-false}
+      SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-15}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "python -m app.db.migrate && python -m app.db.sync-loop"
+
 volumes:
   postgres_data:
-

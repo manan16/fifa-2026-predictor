@@ -2,9 +2,12 @@ from flask import Flask
 from flask_cors import CORS
 
 from app.config import Config
+from app.routes.bracket import bracket_bp
 from app.routes.fixtures import fixtures_bp
 from app.routes.health import health_bp
+from app.routes.odds import odds_bp
 from app.routes.predictions import predictions_bp
+from app.routes.sync import sync_bp
 from app.routes.teams import teams_bp
 
 
@@ -17,6 +20,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.register_blueprint(teams_bp, url_prefix="/api/teams")
     app.register_blueprint(fixtures_bp, url_prefix="/api/fixtures")
     app.register_blueprint(predictions_bp, url_prefix="/api")
+    app.register_blueprint(bracket_bp, url_prefix="/api")
+    app.register_blueprint(odds_bp, url_prefix="/api")
+    app.register_blueprint(sync_bp, url_prefix="/api")
 
     return app
-
