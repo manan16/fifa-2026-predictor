@@ -17,10 +17,13 @@ class Config:
     ODDS_API_MARKETS = os.getenv("ODDS_API_MARKETS", "h2h")
     RESULTS_API_KEY = os.getenv("RESULTS_API_KEY", "")
     RESULTS_API_BASE_URL = os.getenv("RESULTS_API_BASE_URL", "")
-    ENABLE_AUTO_SYNC = os.getenv("ENABLE_AUTO_SYNC", "false").lower() == "true"
+    # Auto-sync is on by default now that the app runs the loop in-process.
+    ENABLE_AUTO_SYNC = os.getenv("ENABLE_AUTO_SYNC", "true").lower() == "true"
     SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "15"))
     JSON_SORT_KEYS = False
 
 
 class TestConfig(Config):
     TESTING = True
+    # Keep the background scheduler out of the test process.
+    ENABLE_AUTO_SYNC = False

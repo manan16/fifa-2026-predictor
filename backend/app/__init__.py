@@ -9,6 +9,7 @@ from app.routes.odds import odds_bp
 from app.routes.predictions import predictions_bp
 from app.routes.sync import sync_bp
 from app.routes.teams import teams_bp
+from app.services.scheduler import start_scheduler
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -23,5 +24,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.register_blueprint(bracket_bp, url_prefix="/api")
     app.register_blueprint(odds_bp, url_prefix="/api")
     app.register_blueprint(sync_bp, url_prefix="/api")
+
+    # Kick off the in-process automatic sync loop when enabled. No-op under
+    # TestConfig (auto-sync defaults to false) and safe to call repeatedly.
+    start_scheduler(app)
 
     return app

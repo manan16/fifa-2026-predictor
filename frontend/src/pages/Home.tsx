@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AnimatedPage from "../components/AnimatedPage";
+import CountUp from "../components/CountUp";
 import MatchCard from "../components/MatchCard";
 import PitchBackground from "../components/PitchBackground";
-import { getFixtures, getPredictions, getSyncStatus, runManualSync } from "../services/api";
-import { Fixture, Prediction, SyncStatus } from "../types";
+import SyncIndicator from "../components/SyncIndicator";
+import { useAutoSync } from "../hooks/useAutoSync";
+import { getFixtures, getPredictions } from "../services/api";
+import { Fixture, Prediction } from "../types";
+
+const favouriteRankLabel = ["Top knockout favourite", "2nd favourite", "3rd favourite"];
 
 export default function Home() {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
+
+  // Sync now runs automatically in the background — no button.
+  const { status: syncStatus, phase: syncPhase } = useAutoSync();
 
   useEffect(() => {
     Promise.all([getFixtures(), getPredictions()])
@@ -20,18 +26,7 @@ export default function Home() {
         setPredictions(predictionData);
       })
       .catch(() => setError("Unable to load dashboard data. Start the backend and seed the database."));
-    getSyncStatus().then(setSyncStatus).catch(() => undefined);
   }, []);
-
-  const handleManualSync = async () => {
-    setSyncing(true);
-    try {
-      await runManualSync();
-      setSyncStatus(await getSyncStatus());
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const favourites = useMemo(
     () =>
@@ -47,7 +42,7 @@ export default function Home() {
 
   return (
     <AnimatedPage className="space-y-8">
-      <PitchBackground className="rounded-none border border-line/10 p-6 shadow-broadcast sm:p-8">
+      <PitchBackground className="animate-pitch-drift rounded-none border border-line/10 p-6 shadow-broadcast sm:p-8">
         <section className="grid gap-8 md:grid-cols-[1.45fr_0.9fr] md:items-center">
           <div>
             <p className="text-sm font-black uppercase tracking-normal text-gold">World Cup 2026 knockout analytics</p>
@@ -75,7 +70,10 @@ export default function Home() {
                     {index + 1}
                   </span>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-line/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-grass to-gold animate-bar-fill" style={{ width: `${100 - index * 13}%` }} />
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-grass to-gold animate-bar-fill"
+                      style={{ width: `${100 - index * 13}%`, animationDelay: `${index * 90}ms` }}
+                    />
                   </div>
                   <span className="w-28 text-right text-xs font-bold text-line/70">{round}</span>
                 </div>
@@ -90,20 +88,10 @@ export default function Home() {
       <section className="border border-line/10 bg-line/[0.06] p-5 shadow-broadcast">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-black text-line">Sync Status</h2>
-            <p className="mt-2 text-sm text-line/60">
-              Last full sync: {syncStatus?.last_run?.status ?? "No sync runs yet"} ·{" "}
-              {syncStatus?.last_run?.message ?? "Demo odds mode works without API keys."}
-            </p>
+            <h2 className="text-xl font-black text-line">Data feed</h2>
+            <p className="mt-1 text-sm text-line/60">Odds and results refresh automatically in the background.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleManualSync}
-            disabled={syncing}
-            className="bg-gold px-4 py-2 text-sm font-black text-stadium transition hover:-translate-y-0.5 disabled:opacity-60"
-          >
-            {syncing ? "Syncing..." : "Run sync"}
-          </button>
+          <SyncIndicator status={syncStatus} phase={syncPhase} />
         </div>
       </section>
 
@@ -114,25 +102,33 @@ export default function Home() {
             View bracket fixtures
           </Link>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {fixtures.slice(0, 4).map((fixture) => (
-            <MatchCard key={fixture.id} fixture={fixture} />
+        <div className="stagger-children grid gap-4 md:grid-cols-2">
+          {fixtures.slice(0, 4).map((fixture, index) => (
+            <div key={fixture.id} className="animate-card-in" style={{ "--i": index } as CSSProperties}>
+              <MatchCard fixture={fixture} />
+            </div>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        {favourites.map((prediction) => {
+      <section className="stagger-children grid gap-4 md:grid-cols-3">
+        {favourites.map((prediction, index) => {
           const favourite =
             prediction.home_win_probability >= prediction.away_win_probability
               ? prediction.home_team || prediction.home_team_name
               : prediction.away_team || prediction.away_team_name;
           const probability = Math.max(prediction.home_win_probability, prediction.away_win_probability);
           return (
-            <div key={`${prediction.fixture_id}-${favourite}`} className="border border-line/10 bg-line/[0.06] p-5 shadow-broadcast">
-              <p className="text-sm font-bold text-line/55">Strongest knockout favourite</p>
+            <div
+              key={`${prediction.fixture_id}-${favourite}`}
+              className="animate-card-in border border-line/10 bg-line/[0.06] p-5 shadow-broadcast transition hover:-translate-y-1 hover:border-gold/40"
+              style={{ "--i": index } as CSSProperties}
+            >
+              <p className="text-sm font-bold text-line/55">{favouriteRankLabel[index] ?? "Favourite"}</p>
               <p className="mt-2 text-xl font-black text-line">{favourite}</p>
-              <p className="mt-3 text-3xl font-black text-gold">{Math.round(probability * 100)}%</p>
+              <p className="mt-3 text-3xl font-black text-gold">
+                <CountUp value={probability} scale={100} suffix="%" />
+              </p>
             </div>
           );
         })}
