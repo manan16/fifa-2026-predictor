@@ -3,9 +3,9 @@ interface Props {
 }
 
 const styles = {
-  Low: "bg-coral/15 text-coral",
-  Medium: "bg-gold/20 text-ink",
-  High: "bg-pitch/15 text-pitch"
+  Low: "bg-orange-500/15 text-orange-300 ring-1 ring-orange-400/25",
+  Medium: "bg-yellow-400/15 text-yellow-300 ring-1 ring-yellow-300/25",
+  High: "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-300/25"
 };
 
 export default function ConfidenceBadge({ confidence }: Props) {
@@ -15,4 +15,3 @@ export default function ConfidenceBadge({ confidence }: Props) {
     </span>
   );
 }
-

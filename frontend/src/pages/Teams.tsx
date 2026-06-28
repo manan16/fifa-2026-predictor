@@ -14,16 +14,16 @@ export default function Teams() {
   }, []);
 
   return (
-    <AnimatedPage className="space-y-6">
+    <AnimatedPage className="mx-auto w-full max-w-[1600px] space-y-6">
       <div>
         <p className="text-sm font-black uppercase text-gold">Squad strength board</p>
-        <h1 className="mt-2 text-3xl font-black text-line">Teams</h1>
-        <p className="mt-2 text-line/65">Seeded sample teams with ranking and Elo-style strength inputs.</p>
+        <h1 className="mt-2 text-3xl font-black text-white">Teams</h1>
+        <p className="mt-2 text-slate-300">Seeded sample teams with ranking and Elo-style strength inputs.</p>
       </div>
       {error && <div className="border border-coral/30 bg-coral/10 p-4 text-coral">{error}</div>}
-      <div className="overflow-x-auto border border-line/10 bg-line/[0.06] shadow-broadcast">
+      <div className="overflow-x-auto border border-white/15 bg-slate-900 shadow-broadcast">
         <table className="w-full min-w-[680px] text-left">
-          <thead className="bg-pitch text-line">
+          <thead className="bg-emerald-700 text-white">
             <tr>
               <th className="px-4 py-3">Team</th>
               <th className="px-4 py-3">Code</th>
@@ -34,15 +34,15 @@ export default function Teams() {
           </thead>
           <tbody>
             {teams.map((team) => (
-              <tr key={team.id} className="border-b border-line/10 text-line/80">
-                <td className="px-4 py-3 font-bold">{team.name}</td>
-                <td className="px-4 py-3">{team.fifa_code}</td>
+              <tr key={team.id} className="border-b border-white/10 bg-slate-900 text-slate-100 hover:bg-emerald-950/70">
+                <td className="px-4 py-3 font-semibold text-white">{team.name}</td>
+                <td className="px-4 py-3 text-slate-100">{team.fifa_code}</td>
                 <td className="px-4 py-3">
                   <span className="border border-gold/25 bg-gold/10 px-2 py-1 text-xs font-black text-gold">
                     {team.confederation}
                   </span>
                 </td>
-                <td className="px-4 py-3">{team.fifa_ranking}</td>
+                <td className="px-4 py-3 text-yellow-300">{team.fifa_ranking}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span className="w-12 font-bold">{team.elo_rating}</span>

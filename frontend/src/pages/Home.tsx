@@ -1,15 +1,24 @@
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AnimatedPage from "../components/AnimatedPage";
+import AlsoTonightCard from "../components/AlsoTonightCard";
 import CountUp from "../components/CountUp";
-import MatchCard from "../components/MatchCard";
+import MatchCentreHero from "../components/MatchCentreHero";
 import PitchBackground from "../components/PitchBackground";
+import RoadToFinalProgress from "../components/RoadToFinalProgress";
 import SyncIndicator from "../components/SyncIndicator";
 import { useAutoSync } from "../hooks/useAutoSync";
 import { getFixtures, getPredictions } from "../services/api";
 import { Fixture, Prediction } from "../types";
 
 const favouriteRankLabel = ["Top knockout favourite", "2nd favourite", "3rd favourite"];
+const stageWeight: Record<string, number> = {
+  Final: 50,
+  "Semi-final": 40,
+  "Quarter-final": 30,
+  "Round of 16": 20,
+  "Round of 32": 10
+};
 
 export default function Home() {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
@@ -40,76 +49,49 @@ export default function Home() {
     [predictions]
   );
 
+  const featuredFixture = useMemo(
+    () =>
+      [...fixtures].sort(
+        (a, b) => (stageWeight[b.stage] ?? 0) - (stageWeight[a.stage] ?? 0) || a.match_number - b.match_number
+      )[0],
+    [fixtures]
+  );
+
+  const alsoTonight = useMemo(
+    () => fixtures.filter((fixture) => fixture.id !== featuredFixture?.id).slice(0, 3),
+    [fixtures, featuredFixture]
+  );
+
   return (
-    <AnimatedPage className="space-y-8">
-      <PitchBackground className="animate-pitch-drift rounded-none border border-line/10 p-6 shadow-broadcast sm:p-8">
-        <section className="grid gap-8 md:grid-cols-[1.45fr_0.9fr] md:items-center">
-          <div>
-            <p className="text-sm font-black uppercase tracking-normal text-gold">World Cup 2026 knockout analytics</p>
-            <h1 className="mt-4 text-4xl font-black tracking-normal sm:text-6xl">
-              Simulate the road to the final.
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg text-line/72">
-              Compare model prediction, market odds, and actual results across the full tournament bracket.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/bracket" className="bg-gold px-5 py-3 text-sm font-black text-stadium shadow-gold transition hover:-translate-y-0.5">
-                View knockout bracket
-              </Link>
-              <Link to="/fixtures" className="border border-line/20 bg-line/10 px-5 py-3 text-sm font-black text-line transition hover:border-gold/70">
-                Browse fixtures
-              </Link>
-            </div>
-          </div>
-          <div className="border border-line/10 bg-stadium/45 p-5 shadow-broadcast">
-            <p className="text-sm font-black uppercase text-line/55">Road to the Final</p>
-            <div className="mt-5 space-y-3">
-              {["Round of 32", "Round of 16", "Quarter-finals", "Semi-finals", "Final"].map((round, index) => (
-                <div key={round} className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 place-items-center rounded-full border border-gold/40 bg-gold/10 text-xs font-black text-gold">
-                    {index + 1}
-                  </span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-line/10">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-grass to-gold animate-bar-fill"
-                      style={{ width: `${100 - index * 13}%`, animationDelay: `${index * 90}ms` }}
-                    />
-                  </div>
-                  <span className="w-28 text-right text-xs font-bold text-line/70">{round}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+    <AnimatedPage className="mx-auto w-full max-w-[1600px] space-y-8">
+      <PitchBackground className="animate-pitch-drift border border-white/10 p-4 shadow-broadcast sm:p-6 xl:p-8">
+        <MatchCentreHero fixture={featuredFixture} />
       </PitchBackground>
 
       {error && <div className="border border-coral/30 bg-coral/10 p-4 text-coral">{error}</div>}
 
-      <section className="border border-line/10 bg-line/[0.06] p-5 shadow-broadcast">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_1.6fr]">
+        <div className="border border-white/15 bg-slate-900/80 p-5 shadow-broadcast">
           <div>
-            <h2 className="text-xl font-black text-line">Data feed</h2>
-            <p className="mt-1 text-sm text-line/60">Odds and results refresh automatically in the background.</p>
+            <h2 className="text-xl font-black text-white">Data feed</h2>
+            <p className="mt-1 text-sm text-slate-300">Odds and results refresh automatically in the background.</p>
           </div>
+          <div className="mt-4">
           <SyncIndicator status={syncStatus} phase={syncPhase} />
+          </div>
+        </div>
+
+        <div>
+          <h2 className="mb-4 text-2xl font-black text-white">Also Tonight</h2>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {alsoTonight.map((fixture) => (
+              <AlsoTonightCard key={fixture.id} fixture={fixture} />
+            ))}
+          </div>
         </div>
       </section>
 
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-line">Opening knockout ties</h2>
-          <Link to="/fixtures" className="font-bold text-gold">
-            View bracket fixtures
-          </Link>
-        </div>
-        <div className="stagger-children grid gap-4 md:grid-cols-2">
-          {fixtures.slice(0, 4).map((fixture, index) => (
-            <div key={fixture.id} className="animate-card-in" style={{ "--i": index } as CSSProperties}>
-              <MatchCard fixture={fixture} />
-            </div>
-          ))}
-        </div>
-      </section>
+      <RoadToFinalProgress currentStage={featuredFixture?.stage} />
 
       <section className="stagger-children grid gap-4 md:grid-cols-3">
         {favourites.map((prediction, index) => {
@@ -121,12 +103,12 @@ export default function Home() {
           return (
             <div
               key={`${prediction.fixture_id}-${favourite}`}
-              className="animate-card-in border border-line/10 bg-line/[0.06] p-5 shadow-broadcast transition hover:-translate-y-1 hover:border-gold/40"
+              className="animate-card-in border border-white/15 bg-slate-900/80 p-5 shadow-broadcast transition hover:-translate-y-1 hover:border-yellow-300/50"
               style={{ "--i": index } as CSSProperties}
             >
-              <p className="text-sm font-bold text-line/55">{favouriteRankLabel[index] ?? "Favourite"}</p>
-              <p className="mt-2 text-xl font-black text-line">{favourite}</p>
-              <p className="mt-3 text-3xl font-black text-gold">
+              <p className="text-sm font-bold text-slate-300">{favouriteRankLabel[index] ?? "Favourite"}</p>
+              <p className="mt-2 text-xl font-black text-white">{favourite}</p>
+              <p className="mt-3 text-3xl font-black text-yellow-300">
                 <CountUp value={probability} scale={100} suffix="%" />
               </p>
             </div>
@@ -141,9 +123,9 @@ export default function Home() {
           ["/teams", "Teams", "Compare ranking, confederation, and Elo rating inputs."],
           ["/model", "Model info", "Understand assumptions, limitations, and roadmap."]
         ].map(([to, title, text]) => (
-          <Link key={to} to={to} className="border border-line/10 bg-pitch/80 p-5 text-line shadow-broadcast transition hover:-translate-y-1 hover:border-gold/60">
+          <Link key={to} to={to} className="border border-white/15 bg-emerald-950/80 p-5 text-white shadow-broadcast transition hover:-translate-y-1 hover:border-yellow-300/60">
             <h3 className="text-xl font-black">{title}</h3>
-            <p className="mt-2 text-sm text-line/70">{text}</p>
+            <p className="mt-2 text-sm text-slate-300">{text}</p>
           </Link>
         ))}
       </section>

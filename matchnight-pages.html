@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Matchnight — page concepts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --pitch:#0a1a14; --turf-1:#102a1e; --turf-2:#0c2117;
+    --chalk:#ecf4ed; --chalk-dim:rgba(236,244,237,.6); --chalk-faint:rgba(236,244,237,.1);
+    --line:rgba(236,244,237,.14); --gold:#f4c430; --sky:#6ec2ff; --coral:#ff6b5a;
+    --display:"Saira Condensed",system-ui,sans-serif; --body:"Saira",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:var(--body); color:var(--chalk); min-height:100vh; -webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(120% 70% at 82% -8%, rgba(244,196,48,.12), transparent 58%),
+      radial-gradient(90% 55% at 6% 2%, rgba(110,194,255,.07), transparent 52%),
+      linear-gradient(180deg, var(--turf-1), var(--pitch) 55%);
+  }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none;
+    background:radial-gradient(38% 46% at 60% -6%, rgba(244,196,48,.09), transparent 70%);
+    animation:flood 16s ease-in-out infinite alternate; }
+  @keyframes flood { from{transform:translateX(-7%);opacity:.65} to{transform:translateX(9%);opacity:1} }
+  .wrap { max-width:1140px; margin:0 auto; padding:0 22px 60px; position:relative; }
+
+  /* nav / tabs */
+  .nav { display:flex; align-items:center; justify-content:space-between; padding:20px 0; border-bottom:1px solid var(--line); flex-wrap:wrap; gap:14px; }
+  .brand .mark { font-family:var(--display); font-weight:800; font-size:21px; letter-spacing:.04em; text-transform:uppercase; }
+  .brand .mark span { color:var(--gold); }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .tab { font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--chalk-dim);
+    background:transparent; border:1px solid var(--line); border-radius:3px; padding:9px 14px; cursor:pointer; transition:.2s; }
+  .tab:hover { color:var(--chalk); border-color:rgba(244,196,48,.4); }
+  .tab.active { color:var(--pitch); background:var(--gold); border-color:var(--gold); font-weight:700; }
+
+  .head { padding:30px 0 6px; }
+  .eyebrow { font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold); display:flex; align-items:center; gap:12px; }
+  .eyebrow::after { content:""; height:1px; width:54px; background:var(--line); }
+  .head h1 { font-family:var(--display); font-weight:800; text-transform:uppercase; font-size:clamp(30px,5vw,46px); line-height:.95; margin:12px 0 0; }
+  .head p { color:var(--chalk-dim); margin:10px 0 0; max-width:560px; }
+
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* shared crest pip + bars */
+  .pip { width:38px; height:44px; display:grid; place-items:center; font-family:var(--display); font-weight:700; font-size:12px; color:var(--chalk);
+    clip-path:polygon(50% 0,100% 22%,100% 78%,50% 100%,0 78%,0 22%);
+    background:linear-gradient(160deg, rgba(236,244,237,.13), rgba(236,244,237,.03)); border:1px solid var(--line); }
+  .pip.gold { color:var(--pitch); background:radial-gradient(circle at 38% 30%, #fff3c4, var(--gold) 62%); border-color:transparent; }
+
+  .supr { position:relative; height:4px; border-radius:2px; background:var(--chalk-faint); overflow:visible; }
+  .supr i { position:absolute; left:0; top:0; height:100%; width:var(--w,50%); background:linear-gradient(90deg, rgba(244,196,48,.25), var(--gold)); border-radius:2px;
+    transform-origin:left; transform:scaleX(0); }
+  .active .supr i { animation:fillx .9s cubic-bezier(.2,.85,.25,1) .2s forwards; }
+  @keyframes fillx { to { transform:scaleX(1); } }
+  .supr .mk { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--sky); left:var(--m,50%); opacity:0; }
+  .active .supr .mk { animation:fade .4s ease .9s forwards; }
+  @keyframes fade { to { opacity:.9; } }
+
+  /* ============ BRACKET ============ */
+  .bracket { position:relative; margin-top:24px; }
+  .bracket .scroll-note { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--chalk-dim); margin-bottom:10px; }
+  .tree { position:relative; display:grid; grid-template-columns:repeat(7,1fr); gap:0; min-height:440px; }
+  .tree svg.links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .tree svg.links path { stroke:var(--chalk); stroke-width:.35; fill:none; opacity:.2; stroke-dasharray:60; stroke-dashoffset:60; }
+  .active .tree svg.links path { animation:draw 1s ease-out forwards; }
+  .active .tree svg.links path.d1 { animation-delay:.2s } .active .tree svg.links path.d2 { animation-delay:.5s } .active .tree svg.links path.d3 { animation-delay:.8s }
+  @keyframes draw { to { stroke-dashoffset:0; } }
+  .col { display:flex; flex-direction:column; justify-content:space-around; padding:0 6px; z-index:1; }
+  .col .rlbl { font-family:var(--mono); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--chalk-dim); text-align:center; margin-bottom:6px; }
+  .tie {
+    border:1px solid var(--line); border-radius:3px; background:rgba(12,33,23,.7); padding:7px 8px; margin:6px 0;
+    opacity:0; transform:translateY(8px);
+  }
+  .active .tie { animation:pop .5s cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes pop { to { opacity:1; transform:none; } }
+  .tie .side { display:flex; align-items:center; justify-content:space-between; gap:6px; font-family:var(--display); font-weight:700; font-size:13px; text-transform:uppercase; padding:2px 0; }
+  .tie .side .p { font-family:var(--mono); font-size:11px; font-weight:700; color:var(--chalk-dim); font-variant-numeric:tabular-nums; }
+  .tie .side.win { color:var(--gold); }
+  .tie .side.win .p { color:var(--gold); }
+  .tie .bar2 { margin:5px 0 2px; }
+  .tie .up { display:inline-block; margin-top:3px; font-family:var(--mono); font-size:8px; letter-spacing:.1em; text-transform:uppercase; color:var(--coral); }
+  .col.final { justify-content:center; }
+  .champ-box { text-align:center; }
+  .champ-box .crown { font-family:var(--mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:8px; }
+  .champ-box .pip { width:64px; height:74px; font-size:18px; margin:0 auto; opacity:0; }
+  .active .champ-box .pip { animation:ignite .7s cubic-bezier(.2,.8,.2,1) 1.1s forwards; }
+  @keyframes ignite { 0%{opacity:0;transform:scale(.7)} 60%{opacity:1;transform:scale(1.06)} 100%{opacity:1;transform:scale(1);box-shadow:0 0 0 7px rgba(244,196,48,.13),0 12px 36px rgba(244,196,48,.3)} }
+  .champ-box .trophy-lbl { font-family:var(--display); font-weight:800; text-transform:uppercase; font-size:18px; margin-top:10px; }
+
+  /* ============ FIXTURES ============ */
+  .filters { display:flex; gap:8px; flex-wrap:wrap; margin:22px 0 18px; }
+  .grp-lbl { font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); margin:22px 0 10px; }
+  .fix { display:flex; align-items:center; gap:16px; border:1px solid var(--line); border-radius:4px; background:rgba(18,42,30,.45);
+    padding:14px 18px; margin-bottom:10px; transition:.25s; opacity:0; transform:translateY(8px); }
+  .active .fix { animation:pop .5s cubic-bezier(.2,.8,.2,1) forwards; }
+  .fix:hover { transform:translateY(-3px); border-color:rgba(244,196,48,.4); box-shadow:0 12px 26px rgba(0,0,0,.3); }
+  .fix .status { display:flex; flex-direction:column; align-items:center; gap:6px; width:78px; flex:none; font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--chalk-dim); text-transform:uppercase; }
+  .dot { width:8px; height:8px; border-radius:50%; position:relative; }
+  .dot.sched { background:var(--gold); } .dot.live { background:var(--coral); } .dot.done { background:var(--chalk-faint); }
+  .dot.sched::after,.dot.live::after { content:""; position:absolute; inset:0; border-radius:50%; background:inherit; animation:ring 1.8s ease-out infinite; }
+  @keyframes ring { 0%{opacity:.5;transform:scale(.6)} 70%,100%{opacity:0;transform:scale(2.6)} }
+  .fix .matchup { flex:1; min-width:0; }
+  .fix .teams { display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:700; text-transform:uppercase; font-size:17px; }
+  .fix .teams .v { color:var(--chalk-dim); font-size:12px; font-family:var(--mono); }
+  .fix .teams .lead { color:var(--gold); }
+  .fix .meta { font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--chalk-dim); margin-top:5px; }
+  .fix .read { width:150px; flex:none; }
+  .fix .read .nums { display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .fix .read .nums .m { color:var(--gold); } .fix .read .nums .k { color:var(--sky); }
+  .fix .read .bar2 { margin-top:6px; }
+  .fix .go { font-family:var(--mono); font-size:16px; color:var(--chalk-dim); flex:none; }
+
+  /* ============ TEAMS ============ */
+  .board { margin-top:22px; border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .board .hrow { display:grid; grid-template-columns:54px 1fr 120px 1fr 80px; gap:14px; padding:12px 18px; background:rgba(12,33,23,.6);
+    font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--chalk-dim); }
+  .trow { display:grid; grid-template-columns:54px 1fr 120px 1fr 80px; gap:14px; align-items:center; padding:13px 18px; border-top:1px solid var(--line);
+    opacity:0; transform:translateY(8px); }
+  .active .trow { animation:pop .5s cubic-bezier(.2,.8,.2,1) forwards; }
+  .trow.top { background:rgba(244,196,48,.05); }
+  .trow .rank { font-family:var(--display); font-weight:800; font-size:26px; line-height:1; color:var(--chalk-dim); font-variant-numeric:tabular-nums; }
+  .trow.top .rank { color:var(--gold); }
+  .trow .who { display:flex; align-items:center; gap:12px; }
+  .trow .who .nm { font-family:var(--display); font-weight:700; text-transform:uppercase; font-size:19px; }
+  .conf { font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--chalk-dim); border:1px solid var(--line); border-radius:3px; padding:4px 8px; justify-self:start; }
+  .elo { display:flex; align-items:center; gap:12px; }
+  .elo .val { font-family:var(--mono); font-size:12px; font-weight:700; width:42px; font-variant-numeric:tabular-nums; }
+  .elo .track { position:relative; flex:1; height:6px; border-radius:3px; background:var(--chalk-faint); overflow:visible; }
+  .elo .track i { position:absolute; inset:0; width:var(--w); background:linear-gradient(90deg,var(--sky),var(--gold)); border-radius:3px; transform-origin:left; transform:scaleX(0); }
+  .active .elo .track i { animation:fillx 1s cubic-bezier(.2,.85,.25,1) .2s forwards; }
+  .elo .track .avg { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--chalk); opacity:.5; left:var(--avg,50%); }
+  .frank { font-family:var(--mono); font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; justify-self:end; }
+
+  /* ============ MODEL ============ */
+  .pipe { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:24px; position:relative; }
+  .stage { border:1px solid var(--line); border-top:3px solid var(--gold); border-radius:4px; padding:16px 14px; background:rgba(18,42,30,.42);
+    opacity:0; transform:translateY(10px); }
+  .active .stage { animation:pop .5s cubic-bezier(.2,.8,.2,1) forwards; }
+  .stage:nth-child(1){animation-delay:.05s}.stage:nth-child(2){animation-delay:.2s}.stage:nth-child(3){animation-delay:.35s}.stage:nth-child(4){animation-delay:.5s}.stage:nth-child(5){animation-delay:.65s}
+  .stage .n { font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--gold); }
+  .stage h4 { font-family:var(--display); font-weight:700; text-transform:uppercase; font-size:17px; margin:8px 0 6px; }
+  .stage p { margin:0; font-size:13px; color:var(--chalk-dim); line-height:1.45; }
+  .model-grid2 { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; margin-top:34px; align-items:start; }
+  .heat { border:1px solid var(--line); border-radius:4px; padding:18px; background:rgba(12,33,23,.55); }
+  .heat .cap { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--chalk-dim); margin-bottom:12px; display:flex; justify-content:space-between; }
+  .grid { display:grid; grid-template-columns:18px repeat(6,1fr); gap:3px; }
+  .grid .cell { aspect-ratio:1; border-radius:2px; display:grid; place-items:center; font-family:var(--mono); font-size:9px; color:rgba(10,26,20,.0); }
+  .grid .axis { font-family:var(--mono); font-size:9px; color:var(--chalk-dim); display:grid; place-items:center; }
+  .grid .cell.diag { outline:1px solid rgba(110,194,255,.5); outline-offset:-1px; }
+  .grid .cell.modal { outline:2px solid var(--gold); outline-offset:-1px; }
+  .legend { display:flex; gap:16px; margin-top:12px; font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--chalk-dim); }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .legend i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+  .limits h4 { font-family:var(--display); font-weight:700; text-transform:uppercase; font-size:19px; margin:0 0 12px; }
+  .limits ul { list-style:none; padding:0; margin:0; }
+  .limits li { font-size:14px; color:var(--chalk-dim); padding:9px 0 9px 22px; border-bottom:1px solid var(--line); position:relative; }
+  .limits li::before { content:"×"; position:absolute; left:0; color:var(--coral); font-weight:700; }
+  .limits .road { margin-top:18px; border:1px solid rgba(244,196,48,.3); border-radius:4px; padding:14px 16px; background:rgba(244,196,48,.06); }
+  .limits .road b { font-family:var(--display); text-transform:uppercase; letter-spacing:.02em; }
+  .limits .road p { margin:6px 0 0; font-size:13px; color:var(--chalk-dim); }
+
+  .note { margin-top:34px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--chalk-dim); }
+  :focus-visible { outline:2px solid var(--gold); outline-offset:3px; }
+
+  @media (max-width:880px){
+    .tree { grid-template-columns:repeat(7,minmax(86px,1fr)); }
+    .bracket { overflow-x:auto; }
+    .pipe { grid-template-columns:1fr 1fr; }
+    .model-grid2 { grid-template-columns:1fr; }
+    .fix .read { display:none; }
+    .board .hrow, .trow { grid-template-columns:40px 1fr 70px; }
+    .board .hrow .h-conf,.board .hrow .h-elo,.trow .conf,.trow .elo { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important}
+    .tie,.fix,.trow,.stage,.champ-box .pip{opacity:1;transform:none}
+    .supr i,.elo .track i{transform:scaleX(1)}
+    .supr .mk{opacity:.9}
+    .tree svg.links path{stroke-dashoffset:0}
+    .champ-box .pip{box-shadow:0 0 0 7px rgba(244,196,48,.13),0 12px 36px rgba(244,196,48,.3)}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav">
+      <div class="brand"><span class="mark">MATCH<span>NIGHT</span></span></div>
+      <div class="tabs">
+        <button class="tab active" data-view="bracket">Bracket</button>
+        <button class="tab" data-view="fixtures">Fixtures</button>
+        <button class="tab" data-view="teams">Teams</button>
+        <button class="tab" data-view="model">The model</button>
+      </div>
+    </nav>
+
+    <!-- ===================== BRACKET ===================== -->
+    <section class="view active" id="bracket">
+      <div class="head">
+        <p class="eyebrow">Tournament wall</p>
+        <h1>Predicted bracket</h1>
+        <p>The desk's path from the Round of 16 to the trophy. Gold marks who advances; the sky tick is the market's line; coral flags a tie where the two disagree.</p>
+      </div>
+      <div class="bracket">
+        <p class="scroll-note">‹ Round of 32 · scroll to expand</p>
+        <div class="tree">
+          <svg class="links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <!-- R16L -> QFL -->
+            <path class="d1" d="M13,12.5 H17.8 V25 H21" /><path class="d1" d="M13,37.5 H17.8 V25 H21" />
+            <path class="d1" d="M13,62.5 H17.8 V75 H21" /><path class="d1" d="M13,87.5 H17.8 V75 H21" />
+            <!-- QFL -> SFL -->
+            <path class="d2" d="M27,25 H32 V50 H35" /><path class="d2" d="M27,75 H32 V50 H35" />
+            <!-- SFL -> FINAL -->
+            <path class="d3" d="M41,50 H46 V50 H49" />
+            <!-- R16R -> QFR -->
+            <path class="d1" d="M87,12.5 H82.2 V25 H79" /><path class="d1" d="M87,37.5 H82.2 V25 H79" />
+            <path class="d1" d="M87,62.5 H82.2 V75 H79" /><path class="d1" d="M87,87.5 H82.2 V75 H79" />
+            <!-- QFR -> SFR -->
+            <path class="d2" d="M73,25 H68 V50 H65" /><path class="d2" d="M73,75 H68 V50 H65" />
+            <!-- SFR -> FINAL -->
+            <path class="d3" d="M59,50 H54 V50 H51" />
+          </svg>
+
+          <!-- R16 Left -->
+          <div class="col">
+            <div class="rlbl">Round of 16</div>
+            <div class="tie"><div class="side win">ARG <span class="p">72</span></div><div class="supr bar2" style="--w:72%;--m:66%"><i></i><span class="mk"></span></div><div class="side">NED <span class="p">28</span></div></div>
+            <div class="tie"><div class="side win">ESP <span class="p">55</span></div><div class="supr bar2" style="--w:55%;--m:63%"><i></i><span class="mk"></span></div><div class="side">CRO <span class="p">45</span></div><span class="up">market disagrees</span></div>
+            <div class="tie"><div class="side win">BRA <span class="p">68</span></div><div class="supr bar2" style="--w:68%;--m:64%"><i></i><span class="mk"></span></div><div class="side">KOR <span class="p">32</span></div></div>
+            <div class="tie"><div class="side win">POR <span class="p">58</span></div><div class="supr bar2" style="--w:58%;--m:55%"><i></i><span class="mk"></span></div><div class="side">GER <span class="p">42</span></div></div>
+          </div>
+          <!-- QF Left -->
+          <div class="col">
+            <div class="rlbl">Quarter</div>
+            <div class="tie"><div class="side win">ARG <span class="p">61</span></div><div class="supr bar2" style="--w:61%;--m:58%"><i></i><span class="mk"></span></div><div class="side">ESP <span class="p">39</span></div></div>
+            <div class="tie"><div class="side win">BRA <span class="p">57</span></div><div class="supr bar2" style="--w:57%;--m:60%"><i></i><span class="mk"></span></div><div class="side">POR <span class="p">43</span></div></div>
+          </div>
+          <!-- SF Left -->
+          <div class="col">
+            <div class="rlbl">Semi</div>
+            <div class="tie"><div class="side win">ARG <span class="p">54</span></div><div class="supr bar2" style="--w:54%;--m:52%"><i></i><span class="mk"></span></div><div class="side">BRA <span class="p">46</span></div></div>
+          </div>
+          <!-- FINAL / champ -->
+          <div class="col final">
+            <div class="champ-box">
+              <span class="crown">Predicted champion</span>
+              <div class="pip gold">ARG</div>
+              <div class="trophy-lbl">Argentina</div>
+            </div>
+          </div>
+          <!-- SF Right -->
+          <div class="col">
+            <div class="rlbl">Semi</div>
+            <div class="tie"><div class="side win">FRA <span class="p">53</span></div><div class="supr bar2" style="--w:53%;--m:51%"><i></i><span class="mk"></span></div><div class="side">ENG <span class="p">47</span></div></div>
+          </div>
+          <!-- QF Right -->
+          <div class="col">
+            <div class="rlbl">Quarter</div>
+            <div class="tie"><div class="side win">FRA <span class="p">56</span></div><div class="supr bar2" style="--w:56%;--m:54%"><i></i><span class="mk"></span></div><div class="side">NED <span class="p">44</span></div></div>
+            <div class="tie"><div class="side win">ENG <span class="p">59</span></div><div class="supr bar2" style="--w:59%;--m:57%"><i></i><span class="mk"></span></div><div class="side">URU <span class="p">41</span></div></div>
+          </div>
+          <!-- R16 Right -->
+          <div class="col">
+            <div class="rlbl">Round of 16</div>
+            <div class="tie"><div class="side win">FRA <span class="p">64</span></div><div class="supr bar2" style="--w:64%;--m:61%"><i></i><span class="mk"></span></div><div class="side">SEN <span class="p">36</span></div></div>
+            <div class="tie"><div class="side win">NED <span class="p">51</span></div><div class="supr bar2" style="--w:51%;--m:58%"><i></i><span class="mk"></span></div><div class="side">MEX <span class="p">49</span></div><span class="up">market disagrees</span></div>
+            <div class="tie"><div class="side win">ENG <span class="p">66</span></div><div class="supr bar2" style="--w:66%;--m:63%"><i></i><span class="mk"></span></div><div class="side">JPN <span class="p">34</span></div></div>
+            <div class="tie"><div class="side win">URU <span class="p">53</span></div><div class="supr bar2" style="--w:53%;--m:50%"><i></i><span class="mk"></span></div><div class="side">BEL <span class="p">47</span></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="note">Demo bracket from seeded data. Model vs market analytics. Not betting advice.</p>
+    </section>
+
+    <!-- ===================== FIXTURES ===================== -->
+    <section class="view" id="fixtures">
+      <div class="head">
+        <p class="eyebrow">Matchday board</p>
+        <h1>Knockout fixtures</h1>
+        <p>Every tie on the schedule, with the desk's pick and the market line on each. Filter by round; tap a match for the full read.</p>
+      </div>
+      <div class="filters">
+        <button class="tab active">All</button>
+        <button class="tab">Round of 32</button>
+        <button class="tab">Round of 16</button>
+        <button class="tab">Quarter</button>
+        <button class="tab">Semi</button>
+        <button class="tab">Final</button>
+      </div>
+
+      <p class="grp-lbl">Today · Round of 16</p>
+      <div class="fix">
+        <div class="status"><span class="dot live"></span>Live · 64'</div>
+        <div class="matchup">
+          <div class="teams"><span class="lead">Argentina</span><span class="v">v</span><span>Netherlands</span></div>
+          <div class="meta">Mercedes-Benz Stadium, Atlanta · 2–1</div>
+        </div>
+        <div class="read"><div class="nums"><span class="m">desk 64%</span><span class="k">mkt 58%</span></div><div class="supr bar2" style="--w:64%;--m:58%"><i></i><span class="mk"></span></div></div>
+        <div class="go">›</div>
+      </div>
+      <div class="fix">
+        <div class="status"><span class="dot sched"></span>20:00</div>
+        <div class="matchup">
+          <div class="teams"><span class="lead">Spain</span><span class="v">v</span><span>Croatia</span></div>
+          <div class="meta">SoFi Stadium, Los Angeles · upset watch</div>
+        </div>
+        <div class="read"><div class="nums"><span class="m">desk 55%</span><span class="k">mkt 63%</span></div><div class="supr bar2" style="--w:55%;--m:63%"><i></i><span class="mk"></span></div></div>
+        <div class="go">›</div>
+      </div>
+
+      <p class="grp-lbl">Tomorrow · Round of 16</p>
+      <div class="fix">
+        <div class="status"><span class="dot sched"></span>17:00</div>
+        <div class="matchup">
+          <div class="teams"><span class="lead">Brazil</span><span class="v">v</span><span>South Korea</span></div>
+          <div class="meta">AT&T Stadium, Dallas</div>
+        </div>
+        <div class="read"><div class="nums"><span class="m">desk 68%</span><span class="k">mkt 64%</span></div><div class="supr bar2" style="--w:68%;--m:64%"><i></i><span class="mk"></span></div></div>
+        <div class="go">›</div>
+      </div>
+      <div class="fix">
+        <div class="status"><span class="dot done"></span>FT</div>
+        <div class="matchup">
+          <div class="teams"><span>Portugal</span><span class="v">v</span><span class="lead">Germany</span></div>
+          <div class="meta">MetLife Stadium · 1–2 · result beat the desk</div>
+        </div>
+        <div class="read"><div class="nums"><span class="m">desk 58%</span><span class="k">mkt 55%</span></div><div class="supr bar2" style="--w:58%;--m:55%"><i></i><span class="mk"></span></div></div>
+        <div class="go">›</div>
+      </div>
+      <p class="note">Kickoff times shown local. Not betting advice.</p>
+    </section>
+
+    <!-- ===================== TEAMS ===================== -->
+    <section class="view" id="teams">
+      <div class="head">
+        <p class="eyebrow">Strength board</p>
+        <h1>Power ranking</h1>
+        <p>The inputs behind every prediction — blended Elo and FIFA ranking, by nation. The chalk tick marks the field average.</p>
+      </div>
+      <div class="board">
+        <div class="hrow"><span>Rank</span><span>Nation</span><span class="h-conf">Confederation</span><span class="h-elo">Elo strength</span><span style="text-align:right">FIFA</span></div>
+        <div class="trow top">
+          <span class="rank" data-count="1">1</span>
+          <div class="who"><span class="pip gold">ARG</span><span class="nm">Argentina</span></div>
+          <span class="conf">CONMEBOL</span>
+          <div class="elo"><span class="val">2086</span><div class="track" style="--w:96%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">1</span>
+        </div>
+        <div class="trow">
+          <span class="rank">2</span>
+          <div class="who"><span class="pip">FRA</span><span class="nm">France</span></div>
+          <span class="conf">UEFA</span>
+          <div class="elo"><span class="val">2042</span><div class="track" style="--w:90%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">2</span>
+        </div>
+        <div class="trow">
+          <span class="rank">3</span>
+          <div class="who"><span class="pip">ESP</span><span class="nm">Spain</span></div>
+          <span class="conf">UEFA</span>
+          <div class="elo"><span class="val">2031</span><div class="track" style="--w:88%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">3</span>
+        </div>
+        <div class="trow">
+          <span class="rank">4</span>
+          <div class="who"><span class="pip">BRA</span><span class="nm">Brazil</span></div>
+          <span class="conf">CONMEBOL</span>
+          <div class="elo"><span class="val">2008</span><div class="track" style="--w:84%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">5</span>
+        </div>
+        <div class="trow">
+          <span class="rank">5</span>
+          <div class="who"><span class="pip">ENG</span><span class="nm">England</span></div>
+          <span class="conf">UEFA</span>
+          <div class="elo"><span class="val">1993</span><div class="track" style="--w:81%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">4</span>
+        </div>
+        <div class="trow">
+          <span class="rank">6</span>
+          <div class="who"><span class="pip">NED</span><span class="nm">Netherlands</span></div>
+          <span class="conf">UEFA</span>
+          <div class="elo"><span class="val">1971</span><div class="track" style="--w:77%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">7</span>
+        </div>
+        <div class="trow">
+          <span class="rank">7</span>
+          <div class="who"><span class="pip">POR</span><span class="nm">Portugal</span></div>
+          <span class="conf">UEFA</span>
+          <div class="elo"><span class="val">1964</span><div class="track" style="--w:75%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">6</span>
+        </div>
+        <div class="trow">
+          <span class="rank">8</span>
+          <div class="who"><span class="pip">URU</span><span class="nm">Uruguay</span></div>
+          <span class="conf">CONMEBOL</span>
+          <div class="elo"><span class="val">1928</span><div class="track" style="--w:68%;--avg:62%"><i></i><span class="avg"></span></div></div>
+          <span class="frank">11</span>
+        </div>
+      </div>
+      <p class="note">Seeded ratings, illustrative. Field average across all 32 knockout nations.</p>
+    </section>
+
+    <!-- ===================== MODEL ===================== -->
+    <section class="view" id="model">
+      <div class="head">
+        <p class="eyebrow">How the desk thinks</p>
+        <h1>The model</h1>
+        <p>A transparent pipeline you can argue with — every step is a deliberate, inspectable choice, not a black box.</p>
+      </div>
+      <div class="pipe">
+        <div class="stage"><span class="n">01 · Inputs</span><h4>Ratings</h4><p>Live Elo blended with FIFA ranking for each nation.</p></div>
+        <div class="stage"><span class="n">02 · Strength</span><h4>The gap</h4><p>One strength number per side; the difference drives everything.</p></div>
+        <div class="stage"><span class="n">03 · Goals</span><h4>Supremacy</h4><p>The gap becomes expected-goal supremacy over a stage-aware total.</p></div>
+        <div class="stage"><span class="n">04 · Grid</span><h4>Poisson + DC</h4><p>A score grid with a Dixon-Coles correction for low-scoring draws.</p></div>
+        <div class="stage"><span class="n">05 · Output</span><h4>Probabilities</h4><p>Win, draw, advance — then optionally blended toward the market.</p></div>
+      </div>
+
+      <div class="model-grid2">
+        <div class="heat">
+          <div class="cap"><span>Score grid · ARG xG 1.9 — NED xG 1.1</span><span>most likely 2–1</span></div>
+          <div class="grid" id="heat"></div>
+          <div class="legend">
+            <span><i style="background:var(--gold)"></i> likelier scoreline</span>
+            <span><i style="outline:1px solid var(--sky);outline-offset:-1px"></i> draw</span>
+            <span><i style="outline:2px solid var(--gold);outline-offset:-1px"></i> model pick</span>
+          </div>
+        </div>
+        <div class="limits">
+          <h4>What it ignores</h4>
+          <ul>
+            <li>Live squads, injuries and suspensions</li>
+            <li>Rest days, travel and altitude</li>
+            <li>Tactical matchups and game state</li>
+            <li>In-tournament form and momentum</li>
+          </ul>
+          <div class="road">
+            <b>On the roadmap</b>
+            <p>xG-based features, historical-match training, Brier-score evaluation, and Monte Carlo bracket simulation.</p>
+          </div>
+        </div>
+      </div>
+      <p class="note">Baseline model, version elo-supremacy-dc-v2. Not betting advice.</p>
+    </section>
+  </div>
+
+<script>
+  const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  function countUp(el, target, dur=800){
+    if(reduce){ el.textContent = target; return; }
+    const start = performance.now();
+    const step = (now)=>{ const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3);
+      el.textContent = Math.round(target*e); if(p<1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  function runCounts(view){ view.querySelectorAll('[data-count]').forEach(el=>countUp(el, parseInt(el.dataset.count,10))); }
+
+  // tab switching (display:none restarts CSS entrance animations for free)
+  document.querySelectorAll('.nav .tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav .tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const id = btn.dataset.view;
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      const view = document.getElementById(id);
+      view.classList.add('active');
+      requestAnimationFrame(()=>runCounts(view));
+    });
+  });
+
+  // fixtures filter chips (visual only in concept)
+  document.querySelectorAll('#fixtures .filters .tab').forEach(b=>{
+    b.addEventListener('click',()=>{ document.querySelectorAll('#fixtures .filters .tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); });
+  });
+
+  // build the Poisson score-grid heatmap
+  (function buildHeat(){
+    const host = document.getElementById('heat'); if(!host) return;
+    const hx=1.9, ax=1.1, N=6;
+    const pois=(l,k)=>{ let f=1; for(let i=2;i<=k;i++) f*=i; return Math.exp(-l)*Math.pow(l,k)/f; };
+    let max=0, cells=[];
+    for(let h=0; h<N; h++) for(let a=0; a<N; a++){ const p=pois(hx,h)*pois(ax,a); max=Math.max(max,p); cells.push({h,a,p}); }
+    // header row: blank corner + away goals 0..5
+    host.innerHTML='';
+    const corner=document.createElement('div'); corner.className='axis'; corner.textContent=''; host.appendChild(corner);
+    for(let a=0;a<N;a++){ const ax2=document.createElement('div'); ax2.className='axis'; ax2.textContent=a; host.appendChild(ax2); }
+    for(let h=0; h<N; h++){
+      const rl=document.createElement('div'); rl.className='axis'; rl.textContent=h; host.appendChild(rl);
+      for(let a=0; a<N; a++){
+        const c=cells.find(x=>x.h===h&&x.a===a); const t=c.p/max;
+        const cell=document.createElement('div'); cell.className='cell';
+        if(h===a) cell.classList.add('diag');
+        if(h===2&&a===1) cell.classList.add('modal');
+        cell.style.background = `rgba(244,196,48,${(0.06+t*0.85).toFixed(3)})`;
+        if(t>0.35){ cell.style.color='rgba(10,26,20,.85)'; cell.textContent=(c.p*100).toFixed(0); }
+        host.appendChild(cell);
+      }
+    }
+  })();
+
+  // initial counts for default view
+  runCounts(document.getElementById('bracket'));
+</script>
+</body>
+</html>

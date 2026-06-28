@@ -36,8 +36,8 @@ export default function KnockoutBracket({ bracket }: Props) {
   ];
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex min-w-[2360px] items-start justify-center gap-6">
+    <div className="overflow-x-auto px-6 py-8">
+      <div className="flex min-w-[1500px] w-max items-start justify-start gap-6">
         {leftRounds.map((round, index) => (
           <BracketRound key={`left-${round.title}`} title={round.title} fixtures={round.fixtures} direction="left" delay={index * 90} />
         ))}
@@ -45,11 +45,11 @@ export default function KnockoutBracket({ bracket }: Props) {
         <section className="flex w-80 shrink-0 animate-card-in flex-col items-center gap-5 pt-20" style={{ animationDelay: "420ms" }}>
           <ChampionCard finalFixture={finalFixture} />
           <div>
-            <h2 className="mb-4 text-center text-sm font-black uppercase text-white/65">Final</h2>
+            <h2 className="mb-4 text-center text-sm font-black uppercase text-slate-200">Final</h2>
             {finalFixture ? (
               <BracketMatchCard fixture={finalFixture} />
             ) : (
-              <div className="w-64 border border-dashed border-white/15 p-4 text-center text-sm text-white/45">TBD</div>
+              <div className="w-64 border border-dashed border-white/15 p-4 text-center text-sm text-slate-400">TBD</div>
             )}
           </div>
         </section>

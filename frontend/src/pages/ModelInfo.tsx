@@ -22,11 +22,11 @@ export default function ModelInfo() {
   ];
 
   return (
-    <AnimatedPage className="space-y-6">
+    <AnimatedPage className="mx-auto w-full max-w-6xl space-y-6">
       <div>
-        <p className="text-sm font-black uppercase text-gold">Prediction engine</p>
-        <h1 className="mt-2 text-3xl font-black text-line">Model Info</h1>
-        <p className="mt-2 max-w-3xl text-line/65">
+        <p className="text-sm font-black uppercase text-yellow-300">Prediction engine</p>
+        <h1 className="mt-2 text-3xl font-black text-white">Model Info</h1>
+        <p className="mt-2 max-w-3xl text-slate-300">
           A transparent supremacy-and-Poisson baseline with a Dixon-Coles draw correction — easy to reason about, and ready to be replaced by a trained model later.
         </p>
       </div>
@@ -34,17 +34,17 @@ export default function ModelInfo() {
         {sections.map((section, index) => (
           <div
             key={section.title}
-            className="animate-card-in border border-line/10 bg-line/[0.06] p-5 shadow-broadcast"
+            className="animate-card-in border border-white/15 bg-slate-900/85 p-5 shadow-broadcast"
             style={{ ["--i" as string]: index } as CSSProperties}
           >
-            <h2 className="text-xl font-black text-gold">{section.title}</h2>
-            <p className="mt-3 text-line/70">{section.body}</p>
+            <h2 className="text-xl font-black text-yellow-300">{section.title}</h2>
+            <p className="mt-3 text-slate-300">{section.body}</p>
           </div>
         ))}
       </div>
-      <div className="border border-gold/25 bg-pitch p-5 text-line shadow-broadcast">
+      <div className="border border-gold/25 bg-emerald-700 p-5 text-white shadow-broadcast">
         <h2 className="text-xl font-black">Future improvements</h2>
-        <p className="mt-3 text-line/75">
+        <p className="mt-3 text-slate-300">
           Official fixture ingestion, historical international match pipelines, player availability, xG-based features, Brier score evaluation, and Monte Carlo bracket simulation.
         </p>
       </div>

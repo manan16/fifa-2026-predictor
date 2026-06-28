@@ -41,29 +41,29 @@ TEAMS = [
 
 FIXTURES = [
     # Round of 32
-    (1, "Round of 32", "Left bracket", "Germany", "Paraguay", "Knockout bracket", "World Cup 2026", "2026-06-29 21:30:00"),
-    (2, "Round of 32", "Left bracket", "France", "Sweden", "Knockout bracket", "World Cup 2026", "2026-06-30 22:00:00"),
-    (3, "Round of 32", "Left bracket", "South Africa", "Canada", "Knockout bracket", "World Cup 2026", "2026-06-28 20:00:00"),
+    (1, "Round of 32", "Left bracket", "South Africa", "Canada", "Knockout bracket", "World Cup 2026", "2026-06-28 20:00:00"),
+    (2, "Round of 32", "Right bracket", "Brazil", "Japan", "Knockout bracket", "World Cup 2026", "2026-06-29 18:00:00"),
+    (3, "Round of 32", "Left bracket", "Germany", "Paraguay", "Knockout bracket", "World Cup 2026", "2026-06-29 21:30:00"),
     (4, "Round of 32", "Left bracket", "Netherlands", "Morocco", "Knockout bracket", "World Cup 2026", "2026-06-30 02:00:00"),
-    (5, "Round of 32", "Left bracket", "Portugal", "Croatia", "Knockout bracket", "World Cup 2026", "2026-07-03 00:00:00"),
-    (6, "Round of 32", "Left bracket", "Spain", "Austria", "Knockout bracket", "World Cup 2026", "2026-07-02 20:00:00"),
-    (7, "Round of 32", "Left bracket", "USA", "Bosnia-Herz", "Knockout bracket", "World Cup 2026", "2026-07-02 01:00:00"),
-    (8, "Round of 32", "Left bracket", "Belgium", "Senegal", "Knockout bracket", "World Cup 2026", "2026-07-01 21:00:00"),
-    (9, "Round of 32", "Right bracket", "Brazil", "Japan", "Knockout bracket", "World Cup 2026", "2026-06-29 18:00:00"),
-    (10, "Round of 32", "Right bracket", "Ivory Coast", "Norway", "Knockout bracket", "World Cup 2026", "2026-06-30 18:00:00"),
-    (11, "Round of 32", "Right bracket", "Mexico", "Ecuador", "Knockout bracket", "World Cup 2026", "2026-07-01 02:00:00"),
-    (12, "Round of 32", "Right bracket", "England", "Congo DR", "Knockout bracket", "World Cup 2026", "2026-07-01 17:00:00"),
-    (13, "Round of 32", "Right bracket", "Argentina", "Cape Verde", "Knockout bracket", "World Cup 2026", "2026-07-03 23:00:00"),
+    (5, "Round of 32", "Right bracket", "Ivory Coast", "Norway", "Knockout bracket", "World Cup 2026", "2026-06-30 18:00:00"),
+    (6, "Round of 32", "Left bracket", "France", "Sweden", "Knockout bracket", "World Cup 2026", "2026-06-30 22:00:00"),
+    (7, "Round of 32", "Right bracket", "Mexico", "Ecuador", "Knockout bracket", "World Cup 2026", "2026-07-01 02:00:00"),
+    (8, "Round of 32", "Right bracket", "England", "Congo DR", "Knockout bracket", "World Cup 2026", "2026-07-01 17:00:00"),
+    (9, "Round of 32", "Left bracket", "Belgium", "Senegal", "Knockout bracket", "World Cup 2026", "2026-07-01 21:00:00"),
+    (10, "Round of 32", "Left bracket", "USA", "Bosnia-Herz", "Knockout bracket", "World Cup 2026", "2026-07-02 01:00:00"),
+    (11, "Round of 32", "Left bracket", "Spain", "Austria", "Knockout bracket", "World Cup 2026", "2026-07-02 20:00:00"),
+    (12, "Round of 32", "Left bracket", "Portugal", "Croatia", "Knockout bracket", "World Cup 2026", "2026-07-03 00:00:00"),
+    (13, "Round of 32", "Right bracket", "Switzerland", "Algeria", "Knockout bracket", "World Cup 2026", "2026-07-03 04:00:00"),
     (14, "Round of 32", "Right bracket", "Australia", "Egypt", "Knockout bracket", "World Cup 2026", "2026-07-03 19:00:00"),
-    (15, "Round of 32", "Right bracket", "Switzerland", "Algeria", "Knockout bracket", "World Cup 2026", "2026-07-03 04:00:00"),
+    (15, "Round of 32", "Right bracket", "Argentina", "Cape Verde", "Knockout bracket", "World Cup 2026", "2026-07-03 23:00:00"),
     (16, "Round of 32", "Right bracket", "Colombia", "Ghana", "Knockout bracket", "World Cup 2026", "2026-07-04 02:30:00"),
     # Round of 16
-    (17, "Round of 16", "Left bracket", "Germany", "France", "Knockout bracket", "World Cup 2026", "2026-07-04 22:00:00"),
-    (18, "Round of 16", "Left bracket", "South Africa", "Morocco", "Knockout bracket", "World Cup 2026", "2026-07-04 18:00:00"),
-    (19, "Round of 16", "Left bracket", "Portugal", "Spain", "Knockout bracket", "World Cup 2026", "2026-07-06 20:00:00"),
-    (20, "Round of 16", "Left bracket", "USA", "Belgium", "Knockout bracket", "World Cup 2026", "2026-07-07 01:00:00"),
-    (21, "Round of 16", "Right bracket", "Brazil", "Norway", "Knockout bracket", "World Cup 2026", "2026-07-05 21:00:00"),
-    (22, "Round of 16", "Right bracket", "Mexico", "England", "Knockout bracket", "World Cup 2026", "2026-07-06 01:00:00"),
+    (17, "Round of 16", "Left bracket", "South Africa", "Morocco", "Knockout bracket", "World Cup 2026", "2026-07-04 18:00:00"),
+    (18, "Round of 16", "Left bracket", "Germany", "France", "Knockout bracket", "World Cup 2026", "2026-07-04 22:00:00"),
+    (19, "Round of 16", "Right bracket", "Brazil", "Norway", "Knockout bracket", "World Cup 2026", "2026-07-05 21:00:00"),
+    (20, "Round of 16", "Right bracket", "Mexico", "England", "Knockout bracket", "World Cup 2026", "2026-07-06 01:00:00"),
+    (21, "Round of 16", "Left bracket", "Portugal", "Spain", "Knockout bracket", "World Cup 2026", "2026-07-06 20:00:00"),
+    (22, "Round of 16", "Left bracket", "USA", "Belgium", "Knockout bracket", "World Cup 2026", "2026-07-07 01:00:00"),
     (23, "Round of 16", "Right bracket", "Argentina", "Australia", "Knockout bracket", "World Cup 2026", "2026-07-07 17:00:00"),
     (24, "Round of 16", "Right bracket", "Switzerland", "Colombia", "Knockout bracket", "World Cup 2026", "2026-07-07 21:00:00"),
     # Quarter-finals
@@ -97,43 +97,81 @@ def seed_database() -> None:
                     team,
                 )
 
+            match_numbers = [fixture[0] for fixture in FIXTURES]
+            cur.execute(
+                """
+                UPDATE fixtures
+                SET match_number = -match_number
+                WHERE venue = 'Knockout bracket'
+                  AND city = 'World Cup 2026'
+                  AND match_number = ANY(%s);
+                """,
+                (match_numbers,),
+            )
+
             for fixture in FIXTURES:
                 cur.execute(
                     """
-                    INSERT INTO fixtures (
-                        match_number,
-                        stage,
-                        group_name,
-                        home_team_id,
-                        away_team_id,
-                        venue,
-                        city,
-                        kickoff_time,
-                        status
-                    )
-                    VALUES (
-                        %s, %s, %s,
-                        (SELECT id FROM teams WHERE name = %s),
-                        (SELECT id FROM teams WHERE name = %s),
-                        %s, %s, %s, 'scheduled'
-                    )
-                    ON CONFLICT (match_number) DO UPDATE SET
-                        stage = EXCLUDED.stage,
-                        group_name = EXCLUDED.group_name,
-                        home_team_id = EXCLUDED.home_team_id,
-                        away_team_id = EXCLUDED.away_team_id,
-                        venue = EXCLUDED.venue,
-                        city = EXCLUDED.city,
-                        kickoff_time = EXCLUDED.kickoff_time,
-                        status = EXCLUDED.status,
+                    UPDATE fixtures
+                    SET match_number = %s,
+                        group_name = %s,
+                        venue = %s,
+                        city = %s,
+                        status = 'scheduled',
                         home_score = NULL,
                         away_score = NULL,
-                        updated_at = CURRENT_TIMESTAMP;
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE stage = %s
+                      AND home_team_id = (SELECT id FROM teams WHERE name = %s)
+                      AND away_team_id = (SELECT id FROM teams WHERE name = %s)
+                      AND kickoff_time = %s
+                    RETURNING id;
                     """,
-                    fixture,
+                    (
+                        fixture[0],
+                        fixture[2],
+                        fixture[5],
+                        fixture[6],
+                        fixture[1],
+                        fixture[3],
+                        fixture[4],
+                        fixture[7],
+                    ),
                 )
+                existing = cur.fetchone()
+                if existing is None:
+                    cur.execute(
+                        """
+                        INSERT INTO fixtures (
+                            match_number,
+                            stage,
+                            group_name,
+                            home_team_id,
+                            away_team_id,
+                            venue,
+                            city,
+                            kickoff_time,
+                            status
+                        )
+                        VALUES (
+                            %s, %s, %s,
+                            (SELECT id FROM teams WHERE name = %s),
+                            (SELECT id FROM teams WHERE name = %s),
+                            %s, %s, %s, 'scheduled'
+                        );
+                        """,
+                        fixture,
+                    )
 
-            match_numbers = [fixture[0] for fixture in FIXTURES]
+            cur.execute(
+                """
+                DELETE FROM predicted_match_stats
+                WHERE fixture_id IN (
+                    SELECT id FROM fixtures WHERE match_number = ANY(%s)
+                );
+                """,
+                (match_numbers,),
+            )
             cur.execute(
                 """
                 DELETE FROM predictions
@@ -178,10 +216,11 @@ def seed_database() -> None:
                         away_win_probability, predicted_home_goals, predicted_away_goals,
                         confidence, explanation_json
                     )
-                    VALUES (%s, 'elo-baseline-v1', %s, %s, %s, %s, %s, %s, %s);
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
                     """,
                     (
                         row["fixture_id"],
+                        prediction["model_version"],
                         prediction["home_win_probability"],
                         prediction["draw_probability"],
                         prediction["away_win_probability"],
@@ -190,6 +229,68 @@ def seed_database() -> None:
                         prediction["confidence"],
                         Jsonb(prediction["explanation"]),
                     ),
+                )
+                stats = prediction["predicted_stats"]
+                cur.execute(
+                    """
+                    INSERT INTO predicted_match_stats (
+                        fixture_id, model_version, expected_home_goals, expected_away_goals,
+                        home_shots, away_shots, home_shots_on_target, away_shots_on_target,
+                        home_possession, away_possession, home_corners, away_corners,
+                        home_yellow_cards, away_yellow_cards, home_red_card_probability,
+                        away_red_card_probability, both_teams_to_score_probability,
+                        over_2_5_goals_probability, clean_sheet_home_probability,
+                        clean_sheet_away_probability, explanation_json
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                    """,
+                    (
+                        row["fixture_id"],
+                        prediction["model_version"],
+                        stats["expected_home_goals"],
+                        stats["expected_away_goals"],
+                        stats["home_shots"],
+                        stats["away_shots"],
+                        stats["home_shots_on_target"],
+                        stats["away_shots_on_target"],
+                        stats["home_possession"],
+                        stats["away_possession"],
+                        stats["home_corners"],
+                        stats["away_corners"],
+                        stats["home_yellow_cards"],
+                        stats["away_yellow_cards"],
+                        stats["home_red_card_probability"],
+                        stats["away_red_card_probability"],
+                        stats["both_teams_to_score_probability"],
+                        stats["over_2_5_goals_probability"],
+                        stats["clean_sheet_home_probability"],
+                        stats["clean_sheet_away_probability"],
+                        Jsonb(prediction["explanation"]),
+                    ),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO watch_links (
+                        fixture_id, region, provider_name, provider_type, url, is_official, note
+                    )
+                    VALUES (
+                        %s,
+                        'UK',
+                        'Official FIFA Match Centre',
+                        'official_match_centre',
+                        'https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026',
+                        true,
+                        'Replace with confirmed broadcaster or official match-centre link when live data is connected.'
+                    )
+                    ON CONFLICT (fixture_id, region, provider_name)
+                    DO UPDATE SET
+                        provider_type = EXCLUDED.provider_type,
+                        url = EXCLUDED.url,
+                        is_official = EXCLUDED.is_official,
+                        note = EXCLUDED.note,
+                        updated_at = CURRENT_TIMESTAMP;
+                    """,
+                    (row["fixture_id"],),
                 )
 
         conn.commit()

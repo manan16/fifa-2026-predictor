@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app.db import queries
+from app.services import stats_prediction_service
 
 fixtures_bp = Blueprint("fixtures", __name__)
 
@@ -30,3 +31,30 @@ def get_fixture_odds(fixture_id: int):
             "consensus": queries.get_odds_consensus_by_fixture_id(fixture_id),
         }
     )
+
+
+@fixtures_bp.get("/<int:fixture_id>/stats")
+def get_fixture_stats(fixture_id: int):
+    fixture = queries.get_fixture_by_id(fixture_id)
+    if fixture is None:
+        return jsonify({"error": "Fixture not found"}), 404
+    predicted = stats_prediction_service.get_predicted_match_stats(fixture_id)
+    actual = stats_prediction_service.get_actual_match_stats(fixture_id)
+    return jsonify(
+        {
+            "fixture_id": fixture_id,
+            "predicted": predicted,
+            "actual": actual,
+            "predicted_stats": predicted,
+            "actual_stats": actual,
+            "note": "Stats are model-generated estimates, not official data.",
+        }
+    )
+
+
+@fixtures_bp.get("/<int:fixture_id>/watch")
+def get_fixture_watch_links(fixture_id: int):
+    fixture = queries.get_fixture_by_id(fixture_id)
+    if fixture is None:
+        return jsonify({"error": "Fixture not found"}), 404
+    return jsonify({"fixture_id": fixture_id, "links": queries.get_watch_links(fixture_id)})

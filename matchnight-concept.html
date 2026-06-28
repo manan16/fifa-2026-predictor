@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Matchnight — design concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --pitch: #0a1a14;
+    --turf-1: #102a1e;
+    --turf-2: #0c2117;
+    --chalk: #ecf4ed;
+    --chalk-dim: rgba(236, 244, 237, 0.6);
+    --chalk-faint: rgba(236, 244, 237, 0.1);
+    --line: rgba(236, 244, 237, 0.14);
+    --gold: #f4c430;   /* the model's call */
+    --sky: #6ec2ff;    /* the market */
+    --coral: #ff6b5a;  /* upset / danger */
+    --display: "Saira Condensed", system-ui, sans-serif;
+    --body: "Saira", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: var(--body);
+    color: var(--chalk);
+    background:
+      radial-gradient(120% 80% at 78% -10%, rgba(244, 196, 48, 0.14), transparent 60%),
+      radial-gradient(90% 60% at 10% 0%, rgba(110, 194, 255, 0.08), transparent 55%),
+      linear-gradient(180deg, var(--turf-1), var(--pitch) 60%);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* drifting floodlight glow */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(40% 50% at 50% -8%, rgba(244, 196, 48, 0.1), transparent 70%);
+    animation: flood 14s ease-in-out infinite alternate;
+  }
+  @keyframes flood {
+    from { transform: translateX(-6%); opacity: 0.7; }
+    to   { transform: translateX(8%);  opacity: 1; }
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 64px; position: relative; }
+
+  /* ---- top bar ---- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0 18px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .mark {
+    font-family: var(--display); font-weight: 800; font-size: 22px;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .brand .mark span { color: var(--gold); }
+  .brand .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+    color: var(--chalk-dim); text-transform: uppercase;
+  }
+  .feed { display: flex; align-items: center; gap: 9px; }
+  .feed .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--gold); position: relative;
+  }
+  .feed .dot::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: var(--gold); animation: ring 1.8s ease-out infinite;
+  }
+  @keyframes ring { 0% { opacity: 0.5; transform: scale(0.6); } 70%,100% { opacity: 0; transform: scale(2.6); } }
+  .feed .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--chalk-dim); text-transform: uppercase; }
+
+  /* ---- eyebrow ---- */
+  .eyebrow {
+    margin: 30px 0 12px; display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em;
+    color: var(--gold); text-transform: uppercase;
+  }
+  .eyebrow::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+
+  /* ---- featured match card ---- */
+  .featured {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(18, 42, 30, 0.9), rgba(12, 33, 23, 0.92));
+    border-radius: 4px;
+    padding: 28px clamp(20px, 4vw, 40px) 32px;
+  }
+  /* chalk pitch lines drawn in the card */
+  .featured svg.pitch { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.5; }
+  .featured .pitch path, .featured .pitch circle, .featured .pitch line { 
+    stroke: var(--chalk); stroke-width: 1; fill: none; opacity: 0.16;
+    stroke-dasharray: 1400; stroke-dashoffset: 1400;
+    animation: draw 1.6s ease-out 0.15s forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .featured-inner { position: relative; }
+
+  .match-meta {
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    color: var(--chalk-dim); text-transform: uppercase; margin-bottom: 22px;
+  }
+  .match-meta .stage { color: var(--gold); }
+  .match-meta .sep { width: 4px; height: 4px; border-radius: 50%; background: var(--chalk-faint); }
+
+  .teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+  .team { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .team.away { order: 3; }
+  .crest {
+    width: 62px; height: 70px; display: grid; place-items: center;
+    font-family: var(--display); font-weight: 800; font-size: 18px; letter-spacing: 0.04em;
+    color: var(--chalk);
+    clip-path: polygon(50% 0, 100% 18%, 100% 78%, 50% 100%, 0 78%, 0 18%);
+    background: linear-gradient(160deg, rgba(236,244,237,0.16), rgba(236,244,237,0.04));
+    border: 1px solid var(--line);
+  }
+  .team .name { font-family: var(--display); font-weight: 700; font-size: clamp(20px, 3.4vw, 30px); text-transform: uppercase; letter-spacing: 0.01em; line-height: 0.95; text-align: center; }
+  .team .seed { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--chalk-dim); }
+
+  .scoreline { text-align: center; }
+  .scoreline .sc {
+    font-family: var(--display); font-weight: 800; font-size: clamp(34px, 7vw, 58px); line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+    display: inline-block;
+  }
+  .scoreline .sc.flip { animation: flip 0.55s cubic-bezier(0.2,0.8,0.2,1) both; }
+  @keyframes flip { from { transform: rotateX(-90deg); opacity: 0; } to { transform: rotateX(0); opacity: 1; } }
+  .scoreline .xg { font-family: var(--mono); font-size: 11px; color: var(--chalk-dim); letter-spacing: 0.1em; margin-top: 6px; }
+
+  /* ---- the signature: tug-of-war supremacy meter ---- */
+  .meter { margin: 30px 0 4px; }
+  .meter-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--chalk-dim);
+    margin-bottom: 12px;
+  }
+  .meter-head b { font-weight: 700; color: var(--chalk); }
+  .rope-zone { position: relative; height: 56px; }
+  .rope {
+    position: absolute; top: 50%; left: 0; right: 0; height: 0;
+    border-top: 2px dashed var(--line); transform: translateY(-50%);
+  }
+  .fill {
+    position: absolute; top: 50%; left: 0; height: 4px; transform: translateY(-50%);
+    width: var(--model); max-width: 100%;
+    background: linear-gradient(90deg, rgba(244,196,48,0.15), var(--gold));
+    border-radius: 2px;
+    transition: width 1.1s cubic-bezier(0.2, 0.85, 0.25, 1);
+  }
+  .knot {
+    position: absolute; top: 50%; left: var(--model);
+    transform: translate(-50%, -50%) scale(0.4); opacity: 0;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff3c4, var(--gold) 60%);
+    box-shadow: 0 0 0 6px rgba(244, 196, 48, 0.16), 0 6px 18px rgba(0,0,0,0.4);
+    transition: left 1.1s cubic-bezier(0.2, 0.85, 0.25, 1), transform 0.5s ease 0.9s, opacity 0.4s ease 0.9s;
+  }
+  .ready .knot { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  .ready .knot.pull { transform: translate(-50%, -50%) scale(1.08); }
+  /* market line */
+  .market {
+    position: absolute; top: calc(50% - 20px); left: var(--market); height: 40px; width: 2px;
+    background: var(--sky); transform: translateX(-50%); opacity: 0;
+    transition: opacity 0.5s ease 1.1s;
+  }
+  .market::before {
+    content: "MARKET"; position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; color: var(--sky); white-space: nowrap;
+  }
+  .ready .market { opacity: 0.95; }
+  /* end labels */
+  .end {
+    position: absolute; bottom: -6px; font-family: var(--mono); font-size: 12px; font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.06em;
+  }
+  .end.home { left: 0; color: var(--gold); }
+  .end.away { right: 0; color: var(--chalk-dim); }
+
+  .edge {
+    margin-top: 18px; display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border: 1px solid rgba(244,196,48,0.4); border-radius: 999px;
+    background: rgba(244,196,48,0.08);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold);
+  }
+  .edge .v { font-weight: 700; }
+
+  .readout { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .chip {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 7px 12px; border-radius: 3px; border: 1px solid var(--line); color: var(--chalk-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chip b { color: var(--chalk); font-weight: 700; }
+  .chip .swatch { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* ---- undercard row ---- */
+  .undercard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+  .tie {
+    border: 1px solid var(--line); border-radius: 4px; padding: 16px;
+    background: rgba(18, 42, 30, 0.5);
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    cursor: default;
+  }
+  .tie:hover, .tie:focus-within {
+    transform: translateY(-4px); border-color: rgba(244,196,48,0.45);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.35);
+  }
+  .tie .row { display: flex; justify-content: space-between; align-items: center; font-family: var(--display); font-weight: 700; text-transform: uppercase; font-size: 18px; }
+  .tie .row .pct { font-family: var(--mono); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tie .row.lead .pct { color: var(--gold); }
+  .tie .row.trail { color: var(--chalk-dim); font-size: 15px; }
+  .tie .row.trail .pct { color: var(--chalk-dim); }
+  .mini { position: relative; height: 4px; border-radius: 2px; background: var(--chalk-faint); margin: 14px 0 10px; overflow: hidden; }
+  .mini .mfill { position: absolute; inset: 0; width: 0; background: linear-gradient(90deg, rgba(244,196,48,0.3), var(--gold)); border-radius: 2px; transition: width 1s cubic-bezier(0.2,0.85,0.25,1) 0.2s; }
+  .mini .mmark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--sky); opacity: 0; transition: opacity 0.4s ease 0.9s; }
+  .ready .mini .mmark { opacity: 0.9; }
+  .tie .foot { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chalk-dim); }
+  .tie .foot .up { color: var(--coral); }
+
+  /* ---- road rail ---- */
+  .rail { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 26px; }
+  .rail .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 16px; }
+  .step { position: relative; }
+  .step .bar { height: 6px; border-radius: 3px; background: var(--chalk-faint); overflow: hidden; }
+  .step .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--sky), var(--gold)); transition: width 0.9s cubic-bezier(0.2,0.85,0.25,1); }
+  .step.done .bar i { width: 100%; }
+  .step .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chalk-dim); margin-top: 8px; display: block; }
+  .step.now .lbl { color: var(--gold); }
+
+  .note { margin-top: 34px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--chalk-dim); }
+
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+  @media (max-width: 720px) {
+    .undercard { grid-template-columns: 1fr; }
+    .rail .steps { grid-template-columns: repeat(2, 1fr); }
+    .team .name { font-size: 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .featured .pitch path, .featured .pitch circle, .featured .pitch line { stroke-dashoffset: 0; }
+    .knot { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .market, .mini .mmark { opacity: 0.95; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">MATCH<span>NIGHT</span></span>
+        <span class="tag">WC26 · knockout desk</span>
+      </div>
+      <div class="feed">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="label">Live · odds synced 2m ago</span>
+      </div>
+    </header>
+
+    <p class="eyebrow">Match of the night · Round of 16</p>
+
+    <section class="featured" id="featured" aria-label="Featured prediction">
+      <svg class="pitch" viewBox="0 0 1000 320" preserveAspectRatio="none" aria-hidden="true">
+        <line x1="500" y1="0" x2="500" y2="320" />
+        <circle cx="500" cy="160" r="64" />
+        <path d="M0 70 L120 70 L120 250 L0 250" />
+        <path d="M1000 70 L880 70 L880 250 L1000 250" />
+      </svg>
+
+      <div class="featured-inner">
+        <div class="match-meta">
+          <span class="stage">Round of 16</span><span class="sep"></span>
+          <span>Sat 4 Jul · 20:00</span><span class="sep"></span>
+          <span>Mercedes-Benz Stadium, Atlanta</span><span class="sep"></span>
+          <span>Win or go home</span>
+        </div>
+
+        <div class="teams">
+          <div class="team home">
+            <div class="crest">ARG</div>
+            <div class="name">Argentina</div>
+            <div class="seed">Seed 1 · Elo 2086</div>
+          </div>
+          <div class="scoreline">
+            <span class="sc" id="score">2–1</span>
+            <div class="xg">xG 1.9 — 1.1</div>
+          </div>
+          <div class="team away">
+            <div class="crest">NED</div>
+            <div class="name">Netherlands</div>
+            <div class="seed">Seed 7 · Elo 1971</div>
+          </div>
+        </div>
+
+        <div class="meter" id="meter" style="--model: 64%; --market: 58%;">
+          <div class="meter-head">
+            <span>Advance probability — <b>the desk's call</b></span>
+            <span>vs market line</span>
+          </div>
+          <div class="rope-zone">
+            <div class="rope"></div>
+            <div class="fill"></div>
+            <div class="market"></div>
+            <div class="knot" id="knot"></div>
+            <span class="end home"><span id="homePct">64</span>% ARG</span>
+            <span class="end away">NED <span id="awayPct">36</span>%</span>
+          </div>
+          <span class="edge">Edge to the desk <span class="v">+6 pts</span> on Argentina</span>
+        </div>
+
+        <div class="readout">
+          <span class="chip"><span class="swatch" style="background:var(--gold)"></span> Model pick <b>Argentina</b></span>
+          <span class="chip"><span class="swatch" style="background:var(--sky)"></span> Market favours <b>Argentina</b></span>
+          <span class="chip">Confidence <b>Medium</b></span>
+          <span class="chip">Best price <b>1.78</b></span>
+        </div>
+      </div>
+    </section>
+
+    <p class="eyebrow">Also tonight</p>
+    <div class="undercard" id="undercard">
+      <!-- tie -->
+      <div class="tie" tabindex="0" style="--model:71%; --market:66%;">
+        <div class="row lead"><span>Brazil</span><span class="pct" data-count="71">71%</span></div>
+        <div class="mini"><i class="mfill"></i><span class="mmark"></span></div>
+        <div class="row trail"><span>Croatia</span><span class="pct">29%</span></div>
+        <div class="foot"><span>Quarter-final</span><span>desk +5</span></div>
+      </div>
+      <div class="tie" tabindex="0" style="--model:52%; --market:61%;">
+        <div class="row lead"><span>Spain</span><span class="pct" data-count="52">52%</span></div>
+        <div class="mini"><i class="mfill"></i><span class="mmark"></span></div>
+        <div class="row trail"><span>England</span><span class="pct">48%</span></div>
+        <div class="foot"><span>Quarter-final</span><span class="up">market disagrees</span></div>
+      </div>
+      <div class="tie" tabindex="0" style="--model:58%; --market:55%;">
+        <div class="row lead"><span>France</span><span class="pct" data-count="58">58%</span></div>
+        <div class="mini"><i class="mfill"></i><span class="mmark"></span></div>
+        <div class="row trail"><span>Portugal</span><span class="pct">42%</span></div>
+        <div class="foot"><span>Quarter-final</span><span>desk +3</span></div>
+      </div>
+    </div>
+
+    <section class="rail" aria-label="Road to the final">
+      <p class="eyebrow" style="margin-top:0">Road to MetLife</p>
+      <div class="steps">
+        <div class="step done"><div class="bar"><i></i></div><span class="lbl">Round of 32</span></div>
+        <div class="step done now"><div class="bar"><i></i></div><span class="lbl">Round of 16</span></div>
+        <div class="step"><div class="bar"><i></i></div><span class="lbl">Quarter-finals</span></div>
+        <div class="step"><div class="bar"><i></i></div><span class="lbl">Semi-finals</span></div>
+        <div class="step"><div class="bar"><i></i></div><span class="lbl">Final · 19 Jul</span></div>
+      </div>
+    </section>
+
+    <p class="note">Model vs market analytics for demonstration. Not betting advice.</p>
+  </div>
+
+<script>
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function countUp(el, target, dur = 900) {
+    if (reduce) { el.textContent = target + '%'; return; }
+    const start = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased) + '%';
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function activate() {
+    document.body.classList.add('ready');
+    document.getElementById('meter').classList.add('ready');
+    document.getElementById('undercard').classList.add('ready');
+
+    // featured count-ups
+    countUp(document.getElementById('homePct'), 64);
+    countUp(document.getElementById('awayPct'), 36);
+
+    // undercard mini fills + counts
+    document.querySelectorAll('#undercard .tie').forEach((t) => {
+      t.querySelector('.mfill').style.width = getComputedStyle(t).getPropertyValue('--model');
+      t.querySelector('.mmark').style.left = getComputedStyle(t).getPropertyValue('--market');
+      const pct = t.querySelector('.pct[data-count]');
+      if (pct) countUp(pct, parseInt(pct.dataset.count, 10));
+    });
+
+    // staged "pull" on the knot once it settles
+    const knot = document.getElementById('knot');
+    setTimeout(() => {
+      knot.classList.add('pull');
+      setTimeout(() => knot.classList.remove('pull'), 260);
+    }, 1250);
+
+    // scoreline flip
+    const sc = document.getElementById('score');
+    sc.classList.add('flip');
+  }
+
+  // hover "tighten" interaction on the rope
+  document.getElementById('featured').addEventListener('mouseenter', () => {
+    if (reduce) return;
+    document.getElementById('knot').classList.add('pull');
+  });
+  document.getElementById('featured').addEventListener('mouseleave', () => {
+    document.getElementById('knot').classList.remove('pull');
+  });
+
+  requestAnimationFrame(() => requestAnimationFrame(activate));
+</script>
+</body>
+</html>

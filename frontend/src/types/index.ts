@@ -30,6 +30,12 @@ export interface Fixture {
   market_home_probability?: number | null;
   market_draw_probability?: number | null;
   market_away_probability?: number | null;
+  home_win_probability?: number | null;
+  draw_probability?: number | null;
+  away_win_probability?: number | null;
+  confidence?: "Low" | "Medium" | "High" | null;
+  model_version?: string | null;
+  prediction_created_at?: string | null;
   average_home_odds?: number | null;
   average_draw_odds?: number | null;
   average_away_odds?: number | null;
@@ -37,14 +43,105 @@ export interface Fixture {
   best_draw_odds?: number | null;
   best_away_odds?: number | null;
   bookmaker_count?: number | null;
+  expected_home_goals?: number | null;
+  expected_away_goals?: number | null;
+  home_shots?: number | null;
+  away_shots?: number | null;
+  home_shots_on_target?: number | null;
+  away_shots_on_target?: number | null;
+  home_possession?: number | null;
+  away_possession?: number | null;
+  home_corners?: number | null;
+  away_corners?: number | null;
+  home_yellow_cards?: number | null;
+  away_yellow_cards?: number | null;
+  home_red_card_probability?: number | null;
+  away_red_card_probability?: number | null;
+  both_teams_to_score_probability?: number | null;
+  over_2_5_goals_probability?: number | null;
+  clean_sheet_home_probability?: number | null;
+  clean_sheet_away_probability?: number | null;
   last_odds_sync?: string | null;
   last_result_sync?: string | null;
   home_team_name: string;
   away_team_name: string;
   home_team_code?: string;
   away_team_code?: string;
+  home_team_ranking?: number | null;
+  away_team_ranking?: number | null;
   home_team_elo?: number;
   away_team_elo?: number;
+}
+
+export interface PredictedMatchStats {
+  fixture_id?: number;
+  model_version?: string | null;
+  expected_home_goals: number;
+  expected_away_goals: number;
+  home_shots: number;
+  away_shots: number;
+  home_shots_on_target: number;
+  away_shots_on_target: number;
+  home_possession: number;
+  away_possession: number;
+  home_corners: number;
+  away_corners: number;
+  home_yellow_cards: number;
+  away_yellow_cards: number;
+  home_red_card_probability: number;
+  away_red_card_probability: number;
+  both_teams_to_score_probability: number;
+  over_2_5_goals_probability: number;
+  clean_sheet_home_probability: number;
+  clean_sheet_away_probability: number;
+  explanation_json?: string[];
+  created_at?: string;
+}
+
+export interface ActualMatchStats {
+  fixture_id?: number;
+  home_shots: number | null;
+  away_shots: number | null;
+  home_shots_on_target: number | null;
+  away_shots_on_target: number | null;
+  home_possession: number | null;
+  away_possession: number | null;
+  home_corners: number | null;
+  away_corners: number | null;
+  home_yellow_cards: number | null;
+  away_yellow_cards: number | null;
+  home_red_cards: number | null;
+  away_red_cards: number | null;
+  source?: string | null;
+  last_sync?: string | null;
+  created_at?: string;
+}
+
+export interface FixtureStatsResponse {
+  fixture_id: number;
+  predicted: PredictedMatchStats | null;
+  actual: ActualMatchStats | null;
+  predicted_stats: PredictedMatchStats | null;
+  actual_stats: ActualMatchStats | null;
+  note: string;
+}
+
+export interface WatchLink {
+  id?: number;
+  fixture_id?: number;
+  region: string;
+  provider_name: string;
+  provider_type: string;
+  url: string;
+  is_official: boolean;
+  note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FixtureWatchResponse {
+  fixture_id: number;
+  links: WatchLink[];
 }
 
 export interface Prediction {
@@ -65,6 +162,7 @@ export interface Prediction {
   explanation_json?: string[];
   home_advance_probability?: number;
   away_advance_probability?: number;
+  predicted_stats?: PredictedMatchStats;
 }
 
 export interface PredictPayload {
@@ -166,6 +264,24 @@ export interface BracketFixture {
   best_draw_odds: number | null;
   best_away_odds: number | null;
   bookmaker_count: number | null;
+  expected_home_goals?: number | null;
+  expected_away_goals?: number | null;
+  home_shots?: number | null;
+  away_shots?: number | null;
+  home_shots_on_target?: number | null;
+  away_shots_on_target?: number | null;
+  home_possession?: number | null;
+  away_possession?: number | null;
+  home_corners?: number | null;
+  away_corners?: number | null;
+  home_yellow_cards?: number | null;
+  away_yellow_cards?: number | null;
+  home_red_card_probability?: number | null;
+  away_red_card_probability?: number | null;
+  both_teams_to_score_probability?: number | null;
+  over_2_5_goals_probability?: number | null;
+  clean_sheet_home_probability?: number | null;
+  clean_sheet_away_probability?: number | null;
   last_odds_sync?: string | null;
   last_result_sync?: string | null;
   confidence: "Low" | "Medium" | "High" | null;

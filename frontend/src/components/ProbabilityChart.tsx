@@ -16,7 +16,7 @@ export default function ProbabilityChart({ homeTeam, awayTeam, home, draw, away 
   ];
 
   return (
-    <div className="h-72 bg-white p-4 shadow-sm">
+    <div className="h-72 border border-white/15 bg-slate-900/85 p-4 text-slate-100 shadow-broadcast">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -29,4 +29,3 @@ export default function ProbabilityChart({ homeTeam, awayTeam, home, draw, away 
     </div>
   );
 }
-

@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from app.db import queries
 from app.db.connection import get_connection, get_dict_cursor
+from app.ml.model import predict_match
 from app.services import odds_service, results_service
 
 
@@ -122,12 +124,68 @@ def run_results_sync() -> dict[str, Any]:
         return {"status": "failed", "message": str(exc), "records_processed": 0}
 
 
+def run_prediction_stats_sync() -> dict[str, Any]:
+    sync_id = _start_sync_run("prediction_stats_sync")
+    try:
+        with get_dict_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    f.id AS fixture_id,
+                    f.stage,
+                    ht.name AS home_name,
+                    ht.fifa_ranking AS home_fifa_ranking,
+                    ht.elo_rating AS home_elo_rating,
+                    at.name AS away_name,
+                    at.fifa_ranking AS away_fifa_ranking,
+                    at.elo_rating AS away_elo_rating
+                FROM fixtures f
+                JOIN teams ht ON f.home_team_id = ht.id
+                JOIN teams at ON f.away_team_id = at.id
+                ORDER BY f.match_number;
+                """
+            )
+            rows = list(cur.fetchall())
+
+        records = 0
+        for row in rows:
+            home_team = {
+                "name": row["home_name"],
+                "fifa_ranking": row["home_fifa_ranking"],
+                "elo_rating": row["home_elo_rating"],
+            }
+            away_team = {
+                "name": row["away_name"],
+                "fifa_ranking": row["away_fifa_ranking"],
+                "elo_rating": row["away_elo_rating"],
+            }
+            prediction = predict_match(home_team, away_team, stage=row["stage"], neutral_venue=True)
+            queries.insert_predicted_match_stats(
+                row["fixture_id"],
+                prediction["predicted_stats"],
+                prediction["model_version"],
+                prediction["explanation"],
+            )
+            records += 1
+
+        message = "Regenerated predicted match stats."
+        _finish_sync_run(sync_id, "success", message, records)
+        return {"status": "success", "message": message, "records_processed": records}
+    except Exception as exc:
+        _finish_sync_run(sync_id, "failed", str(exc), 0)
+        return {"status": "failed", "message": str(exc), "records_processed": 0}
+
+
 def run_full_sync() -> dict[str, Any]:
     result_sync = run_results_sync()
     odds_sync = run_odds_sync()
     results_service.advance_winners_in_bracket()
+    stats_sync = run_prediction_stats_sync()
     return {
-        "status": "success" if result_sync["status"] == odds_sync["status"] == "success" else "partial",
+        "status": "success"
+        if result_sync["status"] == odds_sync["status"] == stats_sync["status"] == "success"
+        else "partial",
         "results": result_sync,
         "odds": odds_sync,
+        "predicted_stats": stats_sync,
     }

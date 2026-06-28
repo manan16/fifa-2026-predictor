@@ -11,6 +11,62 @@ KNOCKOUT_STAGES = (
     "Final",
 )
 
+PREDICTED_STATS_COLUMNS = (
+    "expected_home_goals",
+    "expected_away_goals",
+    "home_shots",
+    "away_shots",
+    "home_shots_on_target",
+    "away_shots_on_target",
+    "home_possession",
+    "away_possession",
+    "home_corners",
+    "away_corners",
+    "home_yellow_cards",
+    "away_yellow_cards",
+    "home_red_card_probability",
+    "away_red_card_probability",
+    "both_teams_to_score_probability",
+    "over_2_5_goals_probability",
+    "clean_sheet_home_probability",
+    "clean_sheet_away_probability",
+)
+
+
+PREDICTED_STATS_SELECT = """
+    ps.expected_home_goals::float AS expected_home_goals,
+    ps.expected_away_goals::float AS expected_away_goals,
+    ps.home_shots,
+    ps.away_shots,
+    ps.home_shots_on_target,
+    ps.away_shots_on_target,
+    ps.home_possession::float AS home_possession,
+    ps.away_possession::float AS away_possession,
+    ps.home_corners,
+    ps.away_corners,
+    ps.home_yellow_cards,
+    ps.away_yellow_cards,
+    ps.home_red_card_probability::float AS home_red_card_probability,
+    ps.away_red_card_probability::float AS away_red_card_probability,
+    ps.both_teams_to_score_probability::float AS both_teams_to_score_probability,
+    ps.over_2_5_goals_probability::float AS over_2_5_goals_probability,
+    ps.clean_sheet_home_probability::float AS clean_sheet_home_probability,
+    ps.clean_sheet_away_probability::float AS clean_sheet_away_probability
+"""
+
+WATCH_LINK_SELECT = """
+    id,
+    fixture_id,
+    region,
+    provider_name,
+    provider_type,
+    url,
+    is_official,
+    note,
+    created_at,
+    updated_at
+"""
+
 
 def get_all_teams() -> list[dict[str, Any]]:
     with get_dict_cursor() as cur:
@@ -58,11 +114,68 @@ def get_all_fixtures() -> list[dict[str, Any]]:
                 ht.elo_rating AS home_team_elo,
                 at.name AS away_team_name,
                 at.fifa_code AS away_team_code,
-                at.elo_rating AS away_team_elo
+                at.elo_rating AS away_team_elo,
+                p.predicted_home_goals,
+                p.predicted_away_goals,
+                p.home_win_probability::float AS home_win_probability,
+                p.draw_probability::float AS draw_probability,
+                p.away_win_probability::float AS away_win_probability,
+                p.confidence,
+                p.model_version,
+                p.created_at AS prediction_created_at,
+                oc.home_probability::float AS market_home_probability,
+                oc.draw_probability::float AS market_draw_probability,
+                oc.away_probability::float AS market_away_probability,
+                oc.average_home_odds::float AS average_home_odds,
+                oc.average_draw_odds::float AS average_draw_odds,
+                oc.average_away_odds::float AS average_away_odds,
+                oc.best_home_odds::float AS best_home_odds,
+                oc.best_draw_odds::float AS best_draw_odds,
+                oc.best_away_odds::float AS best_away_odds,
+                oc.bookmaker_count,
+                ps.expected_home_goals::float AS expected_home_goals,
+                ps.expected_away_goals::float AS expected_away_goals,
+                ps.home_shots,
+                ps.away_shots,
+                ps.home_shots_on_target,
+                ps.away_shots_on_target,
+                ps.home_possession::float AS home_possession,
+                ps.away_possession::float AS away_possession,
+                ps.home_corners,
+                ps.away_corners,
+                ps.home_yellow_cards,
+                ps.away_yellow_cards,
+                ps.home_red_card_probability::float AS home_red_card_probability,
+                ps.away_red_card_probability::float AS away_red_card_probability,
+                ps.both_teams_to_score_probability::float AS both_teams_to_score_probability,
+                ps.over_2_5_goals_probability::float AS over_2_5_goals_probability,
+                ps.clean_sheet_home_probability::float AS clean_sheet_home_probability,
+                ps.clean_sheet_away_probability::float AS clean_sheet_away_probability
             FROM fixtures f
             LEFT JOIN teams ht ON f.home_team_id = ht.id
             LEFT JOIN teams at ON f.away_team_id = at.id
             LEFT JOIN teams wt ON f.winner_team_id = wt.id
+            LEFT JOIN LATERAL (
+                SELECT *
+                FROM predictions p
+                WHERE p.fixture_id = f.id
+                ORDER BY p.created_at DESC, p.id DESC
+                LIMIT 1
+            ) p ON true
+            LEFT JOIN LATERAL (
+                SELECT *
+                FROM odds_consensus oc
+                WHERE oc.fixture_id = f.id AND oc.market_key = 'h2h'
+                ORDER BY oc.calculated_at DESC, oc.id DESC
+                LIMIT 1
+            ) oc ON true
+            LEFT JOIN LATERAL (
+                SELECT *
+                FROM predicted_match_stats ps
+                WHERE ps.fixture_id = f.id
+                ORDER BY ps.created_at DESC, ps.id DESC
+                LIMIT 1
+            ) ps ON true
             ORDER BY f.kickoff_time, f.match_number;
             """
         )
@@ -106,6 +219,13 @@ def get_fixture_by_id(fixture_id: int) -> dict[str, Any] | None:
                 FROM odds_consensus
                 WHERE fixture_id = %s AND market_key = 'h2h'
                 ORDER BY fixture_id, market_key, calculated_at DESC, id DESC
+            ),
+            latest_stats AS (
+                SELECT DISTINCT ON (fixture_id)
+                    *
+                FROM predicted_match_stats
+                WHERE fixture_id = %s
+                ORDER BY fixture_id, created_at DESC, id DESC
             )
             SELECT
                 f.id,
@@ -150,16 +270,35 @@ def get_fixture_by_id(fixture_id: int) -> dict[str, Any] | None:
                 lc.best_draw_odds,
                 lc.best_away_odds,
                 lc.bookmaker_count,
-                lc.calculated_at AS odds_calculated_at
+                lc.calculated_at AS odds_calculated_at,
+                ps.expected_home_goals::float AS expected_home_goals,
+                ps.expected_away_goals::float AS expected_away_goals,
+                ps.home_shots,
+                ps.away_shots,
+                ps.home_shots_on_target,
+                ps.away_shots_on_target,
+                ps.home_possession::float AS home_possession,
+                ps.away_possession::float AS away_possession,
+                ps.home_corners,
+                ps.away_corners,
+                ps.home_yellow_cards,
+                ps.away_yellow_cards,
+                ps.home_red_card_probability::float AS home_red_card_probability,
+                ps.away_red_card_probability::float AS away_red_card_probability,
+                ps.both_teams_to_score_probability::float AS both_teams_to_score_probability,
+                ps.over_2_5_goals_probability::float AS over_2_5_goals_probability,
+                ps.clean_sheet_home_probability::float AS clean_sheet_home_probability,
+                ps.clean_sheet_away_probability::float AS clean_sheet_away_probability
             FROM fixtures f
             LEFT JOIN teams ht ON f.home_team_id = ht.id
             LEFT JOIN teams at ON f.away_team_id = at.id
             LEFT JOIN teams wt ON f.winner_team_id = wt.id
             LEFT JOIN latest_predictions lp ON lp.fixture_id = f.id
             LEFT JOIN latest_consensus lc ON lc.fixture_id = f.id
+            LEFT JOIN latest_stats ps ON ps.fixture_id = f.id
             WHERE f.id = %s;
             """,
-            (fixture_id, fixture_id, fixture_id),
+            (fixture_id, fixture_id, fixture_id, fixture_id),
         )
         return cur.fetchone()
 
@@ -265,6 +404,12 @@ def get_bracket_fixtures_with_odds_results() -> list[dict[str, Any]]:
                 FROM odds_consensus
                 WHERE market_key = 'h2h'
                 ORDER BY fixture_id, market_key, calculated_at DESC, id DESC
+            ),
+            latest_stats AS (
+                SELECT DISTINCT ON (fixture_id)
+                    *
+                FROM predicted_match_stats
+                ORDER BY fixture_id, created_at DESC, id DESC
             )
             SELECT
                 f.id,
@@ -323,13 +468,32 @@ def get_bracket_fixtures_with_odds_results() -> list[dict[str, Any]]:
                 lc.best_draw_odds,
                 lc.best_away_odds,
                 lc.bookmaker_count,
-                lc.calculated_at AS odds_calculated_at
+                lc.calculated_at AS odds_calculated_at,
+                ps.expected_home_goals::float AS expected_home_goals,
+                ps.expected_away_goals::float AS expected_away_goals,
+                ps.home_shots,
+                ps.away_shots,
+                ps.home_shots_on_target,
+                ps.away_shots_on_target,
+                ps.home_possession::float AS home_possession,
+                ps.away_possession::float AS away_possession,
+                ps.home_corners,
+                ps.away_corners,
+                ps.home_yellow_cards,
+                ps.away_yellow_cards,
+                ps.home_red_card_probability::float AS home_red_card_probability,
+                ps.away_red_card_probability::float AS away_red_card_probability,
+                ps.both_teams_to_score_probability::float AS both_teams_to_score_probability,
+                ps.over_2_5_goals_probability::float AS over_2_5_goals_probability,
+                ps.clean_sheet_home_probability::float AS clean_sheet_home_probability,
+                ps.clean_sheet_away_probability::float AS clean_sheet_away_probability
             FROM fixtures f
             JOIN teams ht ON f.home_team_id = ht.id
             JOIN teams at ON f.away_team_id = at.id
             LEFT JOIN teams wt ON f.winner_team_id = wt.id
             LEFT JOIN latest_predictions lp ON lp.fixture_id = f.id
             LEFT JOIN latest_consensus lc ON lc.fixture_id = f.id
+            LEFT JOIN latest_stats ps ON ps.fixture_id = f.id
             WHERE f.stage = ANY(%s)
             ORDER BY
                 CASE f.stage
@@ -379,6 +543,121 @@ def get_fixture_odds(fixture_id: int) -> list[dict[str, Any]]:
             (fixture_id,),
         )
         return list(cur.fetchall())
+
+
+def get_predicted_match_stats(fixture_id: int) -> dict[str, Any] | None:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                fixture_id,
+                model_version,
+                expected_home_goals::float AS expected_home_goals,
+                expected_away_goals::float AS expected_away_goals,
+                home_shots,
+                away_shots,
+                home_shots_on_target,
+                away_shots_on_target,
+                home_possession::float AS home_possession,
+                away_possession::float AS away_possession,
+                home_corners,
+                away_corners,
+                home_yellow_cards,
+                away_yellow_cards,
+                home_red_card_probability::float AS home_red_card_probability,
+                away_red_card_probability::float AS away_red_card_probability,
+                both_teams_to_score_probability::float AS both_teams_to_score_probability,
+                over_2_5_goals_probability::float AS over_2_5_goals_probability,
+                clean_sheet_home_probability::float AS clean_sheet_home_probability,
+                clean_sheet_away_probability::float AS clean_sheet_away_probability,
+                explanation_json,
+                created_at
+            FROM predicted_match_stats
+            WHERE fixture_id = %s
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1;
+            """,
+            (fixture_id,),
+        )
+        return cur.fetchone()
+
+
+def get_actual_match_stats(fixture_id: int) -> dict[str, Any] | None:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                fixture_id,
+                home_shots,
+                away_shots,
+                home_shots_on_target,
+                away_shots_on_target,
+                home_possession::float AS home_possession,
+                away_possession::float AS away_possession,
+                home_corners,
+                away_corners,
+                home_yellow_cards,
+                away_yellow_cards,
+                home_red_cards,
+                away_red_cards,
+                source,
+                last_sync,
+                created_at
+            FROM actual_match_stats
+            WHERE fixture_id = %s
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1;
+            """,
+            (fixture_id,),
+        )
+        return cur.fetchone()
+
+
+def get_watch_links(fixture_id: int) -> list[dict[str, Any]]:
+    with get_dict_cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT {WATCH_LINK_SELECT}
+            FROM watch_links
+            WHERE fixture_id = %s
+            ORDER BY is_official DESC, region, provider_name;
+            """,
+            (fixture_id,),
+        )
+        return list(cur.fetchall())
+
+
+def insert_watch_link(
+    fixture_id: int,
+    region: str,
+    provider_name: str,
+    provider_type: str,
+    url: str,
+    is_official: bool,
+    note: str,
+) -> dict[str, Any]:
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            f"""
+            INSERT INTO watch_links (
+                fixture_id, region, provider_name, provider_type, url, is_official, note
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (fixture_id, region, provider_name)
+            DO UPDATE SET
+                provider_type = EXCLUDED.provider_type,
+                url = EXCLUDED.url,
+                is_official = EXCLUDED.is_official,
+                note = EXCLUDED.note,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING {WATCH_LINK_SELECT};
+            """,
+            (fixture_id, region, provider_name, provider_type, url, is_official, note),
+        )
+        result = cur.fetchone()
+    conn.commit()
+    return result
 
 
 def get_odds_consensus_by_fixture_id(fixture_id: int) -> dict[str, Any] | None:
@@ -495,6 +774,78 @@ def insert_prediction(prediction_data: dict[str, Any]) -> dict[str, Any]:
                 prediction_data["predicted_away_goals"],
                 prediction_data["confidence"],
                 Jsonb(prediction_data["explanation"]),
+            ),
+        )
+        result = cur.fetchone()
+    conn.commit()
+    if prediction_data.get("predicted_stats"):
+        insert_predicted_match_stats(
+            prediction_data["fixture_id"],
+            prediction_data["predicted_stats"],
+            prediction_data.get("model_version", "elo-baseline-v1"),
+            prediction_data.get("explanation"),
+        )
+    return result
+
+
+def insert_predicted_match_stats(
+    fixture_id: int,
+    stats: dict[str, Any],
+    model_version: str = "elo-baseline-v1",
+    explanation: list[str] | None = None,
+) -> dict[str, Any]:
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO predicted_match_stats (
+                fixture_id,
+                model_version,
+                expected_home_goals,
+                expected_away_goals,
+                home_shots,
+                away_shots,
+                home_shots_on_target,
+                away_shots_on_target,
+                home_possession,
+                away_possession,
+                home_corners,
+                away_corners,
+                home_yellow_cards,
+                away_yellow_cards,
+                home_red_card_probability,
+                away_red_card_probability,
+                both_teams_to_score_probability,
+                over_2_5_goals_probability,
+                clean_sheet_home_probability,
+                clean_sheet_away_probability,
+                explanation_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING *;
+            """,
+            (
+                fixture_id,
+                model_version,
+                stats["expected_home_goals"],
+                stats["expected_away_goals"],
+                stats["home_shots"],
+                stats["away_shots"],
+                stats["home_shots_on_target"],
+                stats["away_shots_on_target"],
+                stats["home_possession"],
+                stats["away_possession"],
+                stats["home_corners"],
+                stats["away_corners"],
+                stats["home_yellow_cards"],
+                stats["away_yellow_cards"],
+                stats["home_red_card_probability"],
+                stats["away_red_card_probability"],
+                stats["both_teams_to_score_probability"],
+                stats["over_2_5_goals_probability"],
+                stats["clean_sheet_home_probability"],
+                stats["clean_sheet_away_probability"],
+                Jsonb(explanation or stats.get("explanation", [])),
             ),
         )
         result = cur.fetchone()

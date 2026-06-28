@@ -15,7 +15,7 @@ export default function ProbabilityBar({ label, value, variant = "model" }: Prop
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase text-white/65">
+      <div className="mb-1 flex items-center justify-between text-xs font-bold uppercase text-slate-300">
         <span>{label}</span>
         <span>{value == null ? "TBD" : `${pct}%`}</span>
       </div>

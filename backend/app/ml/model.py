@@ -104,6 +104,34 @@ def _goal_matrix(
     return home_win / total, draw / total, away_win / total
 
 
+def _poisson_score_probabilities(home_xg: float, away_xg: float, max_goals: int = 8) -> dict[str, float]:
+    both_teams_to_score = 0.0
+    over_2_5 = 0.0
+    clean_sheet_home = 0.0
+    clean_sheet_away = 0.0
+
+    for h in range(max_goals + 1):
+        for a in range(max_goals + 1):
+            p = _poisson_pmf(home_xg, h) * _poisson_pmf(away_xg, a)
+            if h <= 1 and a <= 1:
+                p *= _dixon_coles_tau(h, a, home_xg, away_xg, DIXON_COLES_RHO)
+            if h > 0 and a > 0:
+                both_teams_to_score += p
+            if h + a > 2:
+                over_2_5 += p
+            if a == 0:
+                clean_sheet_home += p
+            if h == 0:
+                clean_sheet_away += p
+
+    return {
+        "both_teams_to_score_probability": round(max(0.0, min(1.0, both_teams_to_score)), 4),
+        "over_2_5_goals_probability": round(max(0.0, min(1.0, over_2_5)), 4),
+        "clean_sheet_home_probability": round(max(0.0, min(1.0, clean_sheet_home)), 4),
+        "clean_sheet_away_probability": round(max(0.0, min(1.0, clean_sheet_away)), 4),
+    }
+
+
 def predict_scoreline(
     home_strength: float,
     away_strength: float,
@@ -132,6 +160,54 @@ def calculate_confidence(probabilities: dict[str, float]) -> str:
     if top_probability >= 0.48 and spread >= 0.12:
         return "Medium"
     return "Low"
+
+
+def generate_predicted_match_stats(
+    home_team: dict[str, Any],
+    away_team: dict[str, Any],
+    home_xg: float,
+    away_xg: float,
+    home_strength: float,
+    away_strength: float,
+    stage: str = "group",
+) -> dict[str, Any]:
+    strength_diff = home_strength - away_strength
+    pressure = max(-1.0, min(1.0, strength_diff / 420.0))
+    stage_pressure = 0.25 if stage.strip().lower() != "group" else 0.0
+
+    home_possession = round(max(35.0, min(65.0, 50.0 + pressure * 13.0)), 1)
+    away_possession = round(100.0 - home_possession, 1)
+
+    home_shots = max(5, round(5.8 + home_xg * 4.7 + max(0.0, pressure) * 2.0))
+    away_shots = max(5, round(5.8 + away_xg * 4.7 + max(0.0, -pressure) * 2.0))
+    home_shots_on_target = min(home_shots, max(1, round(home_shots * (0.31 + min(0.08, home_xg / 30.0)))))
+    away_shots_on_target = min(away_shots, max(1, round(away_shots * (0.31 + min(0.08, away_xg / 30.0)))))
+
+    home_corners = max(2, round(2.2 + home_shots * 0.22 + max(0.0, pressure) * 1.2))
+    away_corners = max(2, round(2.2 + away_shots * 0.22 + max(0.0, -pressure) * 1.2))
+
+    home_yellow_cards = round(1.4 + stage_pressure + max(0.0, -pressure) * 1.2)
+    away_yellow_cards = round(1.4 + stage_pressure + max(0.0, pressure) * 1.2)
+
+    score_probs = _poisson_score_probabilities(home_xg, away_xg)
+
+    return {
+        "expected_home_goals": round(home_xg, 2),
+        "expected_away_goals": round(away_xg, 2),
+        "home_shots": home_shots,
+        "away_shots": away_shots,
+        "home_shots_on_target": home_shots_on_target,
+        "away_shots_on_target": away_shots_on_target,
+        "home_possession": home_possession,
+        "away_possession": away_possession,
+        "home_corners": home_corners,
+        "away_corners": away_corners,
+        "home_yellow_cards": home_yellow_cards,
+        "away_yellow_cards": away_yellow_cards,
+        "home_red_card_probability": round(max(0.015, min(0.12, 0.035 + stage_pressure * 0.025 + max(0.0, -pressure) * 0.025)), 4),
+        "away_red_card_probability": round(max(0.015, min(0.12, 0.035 + stage_pressure * 0.025 + max(0.0, pressure) * 0.025)), 4),
+        **score_probs,
+    }
 
 
 def blend_model_and_market_probabilities(
@@ -255,6 +331,15 @@ def predict_match(
         "predicted_away_goals": predicted_away_goals,
         "home_xg": round(home_xg, 2),
         "away_xg": round(away_xg, 2),
+        "predicted_stats": generate_predicted_match_stats(
+            home_team,
+            away_team,
+            home_xg,
+            away_xg,
+            home_strength,
+            away_strength,
+            stage=stage,
+        ),
         "confidence": calculate_confidence(output_probs),
         "market_comparison": market_comparison,
         "explanation": generate_explanation(

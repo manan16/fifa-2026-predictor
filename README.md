@@ -18,13 +18,16 @@ Portfolio-quality MVP for predicting FIFA World Cup 2026 knockout-stage outcomes
 - Idempotent seed script with 32 knockout teams and 31 demo bracket fixtures
 - Elo-inspired baseline model with Poisson-style scoreline projection
 - 90-minute win/draw/loss probabilities
+- Predicted match stats, including xG, shots, possession, corners, cards, BTTS, over 2.5 goals, and clean-sheet probabilities
+- Premium single-fixture Match Centre page with probability tug-of-war, stat panels, market summary, and legal watch links
 - Knockout advance probabilities for non-group matches
 - Visual knockout bracket page from Round of 32 through the final
 - Betting-market consensus probabilities from API or demo odds
-- Actual result fields with predicted-vs-actual score display
+- Actual result fields with predicted-vs-actual score and stats display
 - Manual and optional worker-based sync jobs for odds/results refresh
 - Responsive React dashboard with fixture detail, bracket view, teams table, and model notes
 - Football-themed UI with pitch backgrounds, broadcast-style match cards, animated probability bars, and bracket reveal animations
+- Full-screen Match Centre dashboard with featured fixture, model-vs-market analytics, and wide data layouts
 - Backend pytest coverage for routes and model probabilities
 
 ## Repository Structure
@@ -102,7 +105,15 @@ Seed demo knockout bracket data:
 cd backend && python -m app.db.seed
 ```
 
-Tables include `teams`, `fixtures`, `team_match_stats`, `predictions`, `historical_matches`, and `schema_migrations`.
+Tables include `teams`, `fixtures`, `team_match_stats`, `predictions`, `predicted_match_stats`, `actual_match_stats`, `watch_links`, `historical_matches`, and `schema_migrations`.
+
+`predicted_match_stats` stores the latest model-generated stat projection for each fixture:
+
+- expected goals, shots, shots on target, possession, corners, yellow cards, and red-card probability for each team
+- both teams to score probability, over 2.5 goals probability, and clean-sheet probability for each team
+- `model_version` and `created_at` for traceability
+
+`actual_match_stats` is optional and can be populated later by a verified results/stats provider. `watch_links` stores legal match-centre or broadcast links by fixture, region, provider, URL, official flag, and note.
 
 ## API Endpoints
 
@@ -113,6 +124,8 @@ GET  /api/teams/<team_id>
 GET  /api/fixtures
 GET  /api/fixtures/<fixture_id>
 GET  /api/fixtures/<fixture_id>/odds
+GET  /api/fixtures/<fixture_id>/stats
+GET  /api/fixtures/<fixture_id>/watch
 GET  /api/bracket
 GET  /api/odds
 GET  /api/predictions
@@ -179,7 +192,9 @@ The backend groups seeded knockout fixtures by stage, joins each fixture to its 
 
 ## UI Theme And Animation
 
-The frontend uses a football analytics theme with a dark stadium shell, deep pitch green surfaces, subtle CSS grass/pitch-line gradients, white line accents, gold trophy highlights, and broadcast-style match tiles.
+The frontend uses a premium football broadcast theme with a dark stadium shell, deep pitch green tactical-board surfaces, subtle CSS pitch markings, white line accents, gold trophy highlights, and broadcast-style match tiles.
+
+The dashboard is a full-screen Match Centre rather than a narrow centred panel. It selects a featured fixture from real API data, preferring later knockout rounds first, and shows predicted score, actual score when available, model probability, market marker, confidence, and best market odds. Dashboard, bracket, fixtures, and teams use wide page-specific layouts; the text-heavy model page remains narrower for readability.
 
 Animation features include:
 
@@ -238,6 +253,7 @@ docker compose exec backend python -m app.db.sync
 ```
 
 The sync flow runs results sync first, then odds sync, recalculates market consensus, and writes rows to `sync_runs`.
+It also regenerates predicted match stats for every fixture as `prediction_stats_sync`.
 
 An optional Docker worker is available behind a compose profile:
 
@@ -257,6 +273,54 @@ Fixture and bracket cards show:
 - Actual winner from `winner_team_id`
 - Upset label when the completed actual winner differs from the model pick
 - Market consensus probability and average odds alongside model probability
+
+## Predicted Match Stats
+
+The model generates predicted stats whenever seed data or API prediction creation runs. Expected goals come from the existing Elo/Poisson scoreline model. Shots, shots on target, corners, and possession are derived from expected goals and team strength difference; possession is capped between 35% and 65% and always sums to 100. Cards rise for weaker/defensive sides and knockout pressure, while red-card probabilities remain low. BTTS, over 2.5, and clean-sheet probabilities are derived from the Poisson score matrix.
+
+`GET /api/fixtures/<fixture_id>/stats` returns:
+
+```json
+{
+  "fixture_id": 1,
+  "predicted_stats": {
+    "expected_home_goals": 1.62,
+    "expected_away_goals": 0.93,
+    "home_shots": 14,
+    "away_shots": 10,
+    "home_possession": 56.8,
+    "away_possession": 43.2
+  },
+  "actual_stats": [],
+  "note": "Stats are model-generated estimates, not official data."
+}
+```
+
+Actual stats are optional and currently display as "Not available yet" until a future results/stats provider populates `actual_match_stats`.
+
+## Match Centre And Watch Links
+
+The fixture detail route `/fixtures/:id` is a dedicated Match Centre inspired by the `matchnight-concept.html` visual reference. It keeps the rest of the app unchanged and shows teams, predicted/actual score, model-vs-market tug-of-war, prediction summary, predicted stats, actual stats, comparison table when actual data exists, market summary, bookmaker snapshot, and a Where to Watch card.
+
+`GET /api/fixtures/<fixture_id>/watch` returns legal watch-link records:
+
+```json
+{
+  "fixture_id": 9,
+  "links": [
+    {
+      "region": "UK",
+      "provider_name": "Official FIFA Match Centre",
+      "provider_type": "official_match_centre",
+      "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026",
+      "is_official": true,
+      "note": "Replace with confirmed broadcaster or official match-centre link when live data is connected."
+    }
+  ]
+}
+```
+
+Seeded watch links intentionally use a safe official FIFA tournament placeholder. The app must only use official/legal sources and should not claim specific broadcaster rights unless a verified API provides them.
 
 ## Prediction Model
 

@@ -35,6 +35,29 @@ FIXTURE = {
     "city": "East Rutherford",
 }
 
+PREDICTED_STATS = {
+    "fixture_id": 1,
+    "model_version": "elo-supremacy-dc-v2",
+    "expected_home_goals": 1.85,
+    "expected_away_goals": 0.95,
+    "home_shots": 14,
+    "away_shots": 9,
+    "home_shots_on_target": 5,
+    "away_shots_on_target": 3,
+    "home_possession": 57.0,
+    "away_possession": 43.0,
+    "home_corners": 6,
+    "away_corners": 4,
+    "home_yellow_cards": 1,
+    "away_yellow_cards": 2,
+    "home_red_card_probability": 0.04,
+    "away_red_card_probability": 0.05,
+    "both_teams_to_score_probability": 0.48,
+    "over_2_5_goals_probability": 0.51,
+    "clean_sheet_home_probability": 0.39,
+    "clean_sheet_away_probability": 0.16,
+}
+
 
 def test_health_endpoint(client):
     response = client.get("/health")
@@ -222,6 +245,54 @@ def test_fixture_odds_endpoint_returns_consensus(client, monkeypatch):
     assert response.status_code == 200
     assert payload["consensus"]["home_probability"] == 0.55
     assert payload["odds"][0]["bookmaker"] == "Bet365"
+
+
+def test_fixture_stats_endpoint_returns_expected_fields(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+    monkeypatch.setattr(fixtures_route.stats_prediction_service, "get_predicted_match_stats", lambda fixture_id: PREDICTED_STATS)
+    monkeypatch.setattr(fixtures_route.stats_prediction_service, "get_actual_match_stats", lambda fixture_id: None)
+
+    response = client.get("/api/fixtures/1/stats")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["fixture_id"] == 1
+    assert payload["predicted"]["home_shots"] == 14
+    assert payload["predicted_stats"]["home_shots"] == 14
+    assert payload["actual"] is None
+    assert {
+        "expected_home_goals",
+        "expected_away_goals",
+        "home_possession",
+        "away_possession",
+        "over_2_5_goals_probability",
+    }.issubset(payload["predicted_stats"])
+
+
+def test_fixture_watch_endpoint_returns_links(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+    monkeypatch.setattr(
+        fixtures_route.queries,
+        "get_watch_links",
+        lambda fixture_id: [
+            {
+                "region": "UK",
+                "provider_name": "Official FIFA Match Centre",
+                "provider_type": "official_match_centre",
+                "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026",
+                "is_official": True,
+                "note": "Replace with confirmed broadcaster once available.",
+            }
+        ],
+    )
+
+    response = client.get("/api/fixtures/1/watch")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["fixture_id"] == 1
+    assert payload["links"][0]["provider_name"] == "Official FIFA Match Centre"
+    assert payload["links"][0]["is_official"] is True
 
 
 def test_odds_endpoint_returns_latest_consensus(client, monkeypatch):
