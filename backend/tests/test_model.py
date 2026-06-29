@@ -1,3 +1,6 @@
+from collections import Counter
+
+from app.db.seed import FIXTURES, TEAMS
 from app.ml.model import calculate_confidence, predict_match
 
 REQUIRED_STATS_FIELDS = {
@@ -30,6 +33,9 @@ PROBABILITY_STATS_FIELDS = {
     "clean_sheet_away_probability",
 }
 
+ARGENTINA = {"name": "Argentina", "fifa_ranking": 1, "elo_rating": 2145}
+CAPE_VERDE = {"name": "Cape Verde", "fifa_ranking": 65, "elo_rating": 1590}
+
 
 def test_predict_match_returns_valid_probabilities():
     prediction = predict_match(
@@ -46,6 +52,62 @@ def test_predict_match_returns_valid_probabilities():
     assert prediction["predicted_home_goals"] >= 0
     assert prediction["predicted_away_goals"] >= 0
     assert prediction["confidence"] in {"Low", "Medium", "High"}
+
+
+def test_neutral_scoreline_and_probabilities_are_slot_symmetric():
+    home_prediction = predict_match(ARGENTINA, CAPE_VERDE, stage="Round of 32", neutral_venue=True)
+    away_prediction = predict_match(CAPE_VERDE, ARGENTINA, stage="Round of 32", neutral_venue=True)
+
+    assert home_prediction["predicted_home_goals"] == away_prediction["predicted_away_goals"]
+    assert home_prediction["predicted_away_goals"] == away_prediction["predicted_home_goals"]
+    assert home_prediction["home_win_probability"] == away_prediction["away_win_probability"]
+    assert home_prediction["away_win_probability"] == away_prediction["home_win_probability"]
+    assert home_prediction["draw_probability"] == away_prediction["draw_probability"]
+
+
+def test_severe_mismatch_produces_large_favourite_margin_regardless_of_slot():
+    home_prediction = predict_match(ARGENTINA, CAPE_VERDE, stage="Round of 32", neutral_venue=True)
+    away_prediction = predict_match(CAPE_VERDE, ARGENTINA, stage="Round of 32", neutral_venue=True)
+
+    assert home_prediction["predicted_home_goals"] >= 3
+    assert home_prediction["predicted_home_goals"] - home_prediction["predicted_away_goals"] >= 3
+    assert away_prediction["predicted_away_goals"] >= 3
+    assert away_prediction["predicted_away_goals"] - away_prediction["predicted_home_goals"] >= 3
+
+
+def test_even_match_does_not_create_spurious_blowout():
+    team_a = {"name": "Team A", "fifa_ranking": 12, "elo_rating": 1900}
+    team_b = {"name": "Team B", "fifa_ranking": 13, "elo_rating": 1895}
+    prediction = predict_match(team_a, team_b, stage="Quarter-final", neutral_venue=True)
+
+    margin = abs(prediction["predicted_home_goals"] - prediction["predicted_away_goals"])
+    assert margin <= 1
+
+
+def test_stronger_favourite_does_not_lose_goals_or_win_probability():
+    favourite = {"name": "Brazil", "fifa_ranking": 5, "elo_rating": 2130}
+    stronger_favourite = {"name": "Brazil", "fifa_ranking": 1, "elo_rating": 2250}
+    underdog = {"name": "Japan", "fifa_ranking": 18, "elo_rating": 1875}
+
+    base_prediction = predict_match(favourite, underdog, stage="Round of 32", neutral_venue=True)
+    stronger_prediction = predict_match(stronger_favourite, underdog, stage="Round of 32", neutral_venue=True)
+
+    assert stronger_prediction["predicted_home_goals"] >= base_prediction["predicted_home_goals"]
+    assert stronger_prediction["home_win_probability"] >= base_prediction["home_win_probability"]
+
+
+def test_seeded_fixture_scorelines_do_not_collapse_to_one_result():
+    teams = {
+        name: {"name": name, "fifa_ranking": ranking, "elo_rating": elo}
+        for name, _code, _confederation, ranking, elo in TEAMS
+    }
+    scorelines = []
+    for _match_number, stage, _group, home_name, away_name, *_rest in FIXTURES:
+        prediction = predict_match(teams[home_name], teams[away_name], stage=stage, neutral_venue=True)
+        scorelines.append(f"{prediction['predicted_home_goals']}-{prediction['predicted_away_goals']}")
+
+    _scoreline, count = Counter(scorelines).most_common(1)[0]
+    assert count / len(scorelines) <= 0.40
 
 
 def test_predicted_match_stats_return_required_fields_and_constraints():
