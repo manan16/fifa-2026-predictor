@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install backend frontend migrate seed sync test docker-up docker-down
+.PHONY: install backend frontend migrate seed regen-predictions sync test docker-up docker-down
 
 install:
 	cd backend && $(PYTHON) -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
@@ -17,6 +17,9 @@ migrate:
 
 seed:
 	cd backend && $(PYTHON) -m app.db.seed
+
+regen-predictions:
+	cd backend && $(PYTHON) -m app.db.regen_predictions
 
 sync:
 	cd backend && $(PYTHON) -m app.db.sync
