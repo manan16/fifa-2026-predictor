@@ -10,7 +10,8 @@ import {
   Team
 } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:9000";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE_URL = configuredApiBaseUrl || (import.meta.env.PROD ? "" : "http://localhost:9000");
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -19,7 +20,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    const hint =
+      import.meta.env.PROD && !configuredApiBaseUrl
+        ? " VITE_API_BASE_URL is not configured for this static deployment."
+        : "";
+    throw new Error(`API request failed: ${response.status}.${hint}`);
   }
 
   return response.json();
