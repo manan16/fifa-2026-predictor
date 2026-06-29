@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BookmakerOdds, Fixture, FixtureStatsResponse, FixtureWatchResponse, OddsConsensus, Prediction } from "../types";
+import { BookmakerOdds, Fixture, FixtureMatchStatsResponse, FixtureStatsResponse, FixtureWatchResponse, OddsConsensus, Prediction } from "../types";
 import ActualStatsPanel from "./ActualStatsPanel";
 import MatchCentreHeader from "./MatchCentreHeader";
 import MarketSummaryCard from "./MarketSummaryCard";
@@ -7,6 +7,7 @@ import PredictedStatsPanel from "./PredictedStatsPanel";
 import ProbabilityTugOfWar from "./ProbabilityTugOfWar";
 import ScoreDisplay from "./ScoreDisplay";
 import StatsComparisonTable from "./StatsComparisonTable";
+import StatsPanel from "./StatsPanel";
 import TeamPanel from "./TeamPanel";
 import WhereToWatchCard from "./WhereToWatchCard";
 
@@ -16,10 +17,11 @@ interface Props {
   consensus: OddsConsensus | null;
   bookmakerOdds: BookmakerOdds[];
   stats: FixtureStatsResponse | null;
+  matchStats: FixtureMatchStatsResponse | null;
   watch: FixtureWatchResponse | null;
 }
 
-export default function MatchCentreDetail({ fixture, prediction, consensus, bookmakerOdds, stats, watch }: Props) {
+export default function MatchCentreDetail({ fixture, prediction, consensus, bookmakerOdds, stats, matchStats, watch }: Props) {
   const modelFavourite = prediction.home_win_probability >= prediction.away_win_probability ? fixture.home_team_name : fixture.away_team_name;
   const marketFavourite = (consensus?.home_probability ?? 0) >= (consensus?.away_probability ?? 0) ? fixture.home_team_name : fixture.away_team_name;
   const hasActualScore = fixture.actual_home_score != null && fixture.actual_away_score != null;
@@ -84,6 +86,7 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
         <MarketSummaryCard prediction={prediction} consensus={consensus} message={modelMarketMessage} />
       </section>
 
+      <StatsPanel homeTeam={fixture.home_team_name} awayTeam={fixture.away_team_name} stats={matchStats} />
       <PredictedStatsPanel homeTeam={fixture.home_team_name} awayTeam={fixture.away_team_name} stats={stats?.predicted ?? stats?.predicted_stats ?? null} />
       <ActualStatsPanel stats={stats?.actual ?? stats?.actual_stats ?? null} hasActualScore={hasActualScore} />
       <StatsComparisonTable predicted={stats?.predicted ?? stats?.predicted_stats ?? null} actual={stats?.actual ?? stats?.actual_stats ?? null} />

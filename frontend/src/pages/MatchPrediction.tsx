@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import AnimatedPage from "../components/AnimatedPage";
 import MatchCentreDetail from "../components/MatchCentreDetail";
-import { getFixture, getFixtureOdds, getFixtureStats, getFixtureWatchLinks, getPrediction } from "../services/api";
-import { BookmakerOdds, Fixture, FixtureStatsResponse, FixtureWatchResponse, OddsConsensus, Prediction } from "../types";
+import { getFixture, getFixtureMatchStats, getFixtureOdds, getFixtureStats, getFixtureWatchLinks, getPrediction } from "../services/api";
+import { BookmakerOdds, Fixture, FixtureMatchStatsResponse, FixtureStatsResponse, FixtureWatchResponse, OddsConsensus, Prediction } from "../types";
 
 export default function MatchPrediction() {
   const { fixtureId } = useParams();
@@ -12,6 +12,7 @@ export default function MatchPrediction() {
   const [consensus, setConsensus] = useState<OddsConsensus | null>(null);
   const [bookmakerOdds, setBookmakerOdds] = useState<BookmakerOdds[]>([]);
   const [stats, setStats] = useState<FixtureStatsResponse | null>(null);
+  const [matchStats, setMatchStats] = useState<FixtureMatchStatsResponse | null>(null);
   const [watch, setWatch] = useState<FixtureWatchResponse | null>(null);
   const [error, setError] = useState("");
 
@@ -28,6 +29,10 @@ export default function MatchPrediction() {
         setWatch(watchData);
       })
       .catch(() => setError("Unable to load this match centre."));
+    // Wikipedia match stats are optional; a failure must never break the page.
+    getFixtureMatchStats(id)
+      .then(setMatchStats)
+      .catch(() => setMatchStats(null));
   }, [fixtureId]);
 
   if (error) {
@@ -50,6 +55,7 @@ export default function MatchPrediction() {
         consensus={consensus}
         bookmakerOdds={bookmakerOdds}
         stats={stats}
+        matchStats={matchStats}
         watch={watch}
       />
       <p className="font-mono text-[11px] tracking-[0.06em] text-chalk-dim">

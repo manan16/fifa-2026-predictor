@@ -1,6 +1,7 @@
 import {
   BracketResponse,
   Fixture,
+  FixtureMatchStatsResponse,
   FixtureOddsResponse,
   FixtureStatsResponse,
   FixtureWatchResponse,
@@ -45,6 +46,8 @@ export const getFixtures = () => request<Fixture[]>("/api/fixtures");
 export const getFixture = (id: number) => request<Fixture>(`/api/fixtures/${id}`);
 export const getFixtureOdds = (id: number) => request<FixtureOddsResponse>(`/api/fixtures/${id}/odds`);
 export const getFixtureStats = (id: number) => request<FixtureStatsResponse>(`/api/fixtures/${id}/stats`);
+export const getFixtureMatchStats = (id: number) =>
+  request<FixtureMatchStatsResponse>(`/api/fixtures/${id}/match-stats`);
 export const getFixtureWatchLinks = (id: number) => request<FixtureWatchResponse>(`/api/fixtures/${id}/watch`);
 export const getBracket = () => request<BracketResponse>("/api/bracket");
 export const getOdds = () => request<unknown[]>("/api/odds");

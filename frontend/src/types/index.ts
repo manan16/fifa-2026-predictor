@@ -126,6 +126,29 @@ export interface FixtureStatsResponse {
   note: string;
 }
 
+export interface TeamMatchStats {
+  team_id: number;
+  fixture_id: number;
+  team_name: string;
+  goals_for: number | null;
+  goals_against: number | null;
+  shots: number | null;
+  shots_on_target: number | null;
+  corners: number | null;
+  corners_conceded: number | null;
+  possession: number | null;
+  yellow_cards: number | null;
+  red_cards: number | null;
+  xg: number | null;
+}
+
+export interface FixtureMatchStatsResponse {
+  home: TeamMatchStats | null;
+  away: TeamMatchStats | null;
+  source?: string;
+  source_note?: string;
+}
+
 export interface WatchLink {
   id?: number;
   fixture_id?: number;

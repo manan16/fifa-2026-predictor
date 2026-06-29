@@ -100,6 +100,22 @@ def get_fixture_stats(fixture_id: int):
     )
 
 
+@fixtures_bp.get("/<int:fixture_id>/match-stats")
+def get_fixture_match_stats(fixture_id: int):
+    fixture = queries.get_fixture_by_id(fixture_id)
+    if fixture is None:
+        return jsonify({"error": "Fixture not found"}), 404
+    stats = queries.get_fixture_match_stats(fixture_id)
+    return jsonify(
+        {
+            "home": stats["home"],
+            "away": stats["away"],
+            "source": "Wikipedia",
+            "source_note": "Match stats via Wikipedia (CC BY-SA).",
+        }
+    )
+
+
 @fixtures_bp.post("/<int:fixture_id>/actual-stats")
 def upsert_actual_match_stats(fixture_id: int):
     fixture = queries.get_fixture_by_id(fixture_id)

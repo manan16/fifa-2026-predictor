@@ -3,10 +3,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from flask import current_app, has_app_context
+
+from app.config import Config
 from app.db import queries
 from app.db.connection import get_connection, get_dict_cursor
 from app.ml.model import predict_match
-from app.services import odds_service, results_service
+from app.services import odds_service, results_service, stats_service
 
 
 def _start_sync_run(job_name: str) -> int:
@@ -176,9 +179,36 @@ def run_prediction_stats_sync() -> dict[str, Any]:
         return {"status": "failed", "message": str(exc), "records_processed": 0}
 
 
+def _stats_sync_enabled() -> bool:
+    if has_app_context():
+        return bool(current_app.config.get("ENABLE_STATS_SYNC", Config.ENABLE_STATS_SYNC))
+    return Config.ENABLE_STATS_SYNC
+
+
+def run_match_stats_sync() -> dict[str, Any]:
+    """Pull Wikipedia match stats into team_match_stats. Never fatal to the run."""
+    if not _stats_sync_enabled():
+        return {"status": "skipped", "message": "ENABLE_STATS_SYNC is off.", "records_processed": 0}
+
+    sync_id = _start_sync_run("match_stats_sync")
+    try:
+        records = stats_service.sync_wikipedia_match_stats()
+        message = (
+            "No Wikipedia match stats matched current fixtures."
+            if records == 0
+            else "Synced Wikipedia match stats."
+        )
+        _finish_sync_run(sync_id, "success", message, records)
+        return {"status": "success", "message": message, "records_processed": records}
+    except Exception as exc:
+        _finish_sync_run(sync_id, "failed", str(exc), 0)
+        return {"status": "failed", "message": str(exc), "records_processed": 0}
+
+
 def run_full_sync() -> dict[str, Any]:
     result_sync = run_results_sync()
     odds_sync = run_odds_sync()
+    match_stats_sync = run_match_stats_sync()
     results_service.advance_winners_in_bracket()
     stats_sync = run_prediction_stats_sync()
     return {
@@ -187,5 +217,6 @@ def run_full_sync() -> dict[str, Any]:
         else "partial",
         "results": result_sync,
         "odds": odds_sync,
+        "match_stats": match_stats_sync,
         "predicted_stats": stats_sync,
     }

@@ -4,6 +4,9 @@ psycopg[binary]
 python-dotenv
 pandas
 scikit-learn
+requests
+beautifulsoup4
+lxml
 pytest
 pytest-flask
 gunicorn

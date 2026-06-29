@@ -706,6 +706,51 @@ def upsert_actual_match_stats(
 insert_or_update_actual_match_stats = upsert_actual_match_stats
 
 
+def get_fixture_match_stats(fixture_id: int) -> dict[str, Any]:
+    """Return the Wikipedia-sourced team_match_stats rows for a fixture.
+
+    Shaped as ``{"home": {...}|None, "away": {...}|None}``, each row joined to its
+    team name and oriented onto the fixture's home/away sides. ``None`` on a side
+    when no row exists yet — callers render nothing rather than an empty panel.
+    """
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                tms.team_id,
+                tms.fixture_id,
+                t.name AS team_name,
+                tms.goals_for,
+                tms.goals_against,
+                tms.shots,
+                tms.shots_on_target,
+                tms.corners,
+                tms.corners_conceded,
+                tms.possession::float AS possession,
+                tms.yellow_cards,
+                tms.red_cards,
+                tms.xg::float AS xg,
+                CASE
+                    WHEN tms.team_id = f.home_team_id THEN 'home'
+                    WHEN tms.team_id = f.away_team_id THEN 'away'
+                END AS side
+            FROM team_match_stats tms
+            JOIN fixtures f ON tms.fixture_id = f.id
+            JOIN teams t ON tms.team_id = t.id
+            WHERE tms.fixture_id = %s;
+            """,
+            (fixture_id,),
+        )
+        rows = list(cur.fetchall())
+
+    result: dict[str, Any] = {"home": None, "away": None}
+    for row in rows:
+        side = row.pop("side", None)
+        if side in ("home", "away"):
+            result[side] = row
+    return result
+
+
 def get_watch_links(fixture_id: int) -> list[dict[str, Any]]:
     with get_dict_cursor() as cur:
         cur.execute(
