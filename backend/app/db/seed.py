@@ -77,6 +77,51 @@ FIXTURES = [
     (31, "Final", "Champion pick", "France", "Argentina", "Knockout bracket", "World Cup 2026", "2026-07-19 20:00:00"),
 ]
 
+DEMO_ACTUAL_RESULTS = {
+    1: {
+        "actual_home_score": 1,
+        "actual_away_score": 2,
+        "winner_team_name": "Canada",
+        "home_penalties": None,
+        "away_penalties": None,
+        "stats": {
+            "home_shots": 10,
+            "away_shots": 13,
+            "home_shots_on_target": 3,
+            "away_shots_on_target": 6,
+            "home_possession": 47,
+            "away_possession": 53,
+            "home_corners": 4,
+            "away_corners": 6,
+            "home_yellow_cards": 2,
+            "away_yellow_cards": 1,
+            "home_red_cards": 0,
+            "away_red_cards": 0,
+        },
+    },
+    2: {
+        "actual_home_score": 3,
+        "actual_away_score": 1,
+        "winner_team_name": "Brazil",
+        "home_penalties": None,
+        "away_penalties": None,
+        "stats": {
+            "home_shots": 17,
+            "away_shots": 9,
+            "home_shots_on_target": 8,
+            "away_shots_on_target": 3,
+            "home_possession": 59,
+            "away_possession": 41,
+            "home_corners": 7,
+            "away_corners": 3,
+            "home_yellow_cards": 1,
+            "away_yellow_cards": 2,
+            "home_red_cards": 0,
+            "away_red_cards": 0,
+        },
+    },
+}
+
 
 def seed_database() -> None:
     conn = get_connection()
@@ -120,6 +165,12 @@ def seed_database() -> None:
                         status = 'scheduled',
                         home_score = NULL,
                         away_score = NULL,
+                        actual_home_score = NULL,
+                        actual_away_score = NULL,
+                        home_penalties = NULL,
+                        away_penalties = NULL,
+                        winner_team_id = NULL,
+                        result_source = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE stage = %s
                       AND home_team_id = (SELECT id FROM teams WHERE name = %s)
@@ -174,6 +225,15 @@ def seed_database() -> None:
             )
             cur.execute(
                 """
+                DELETE FROM actual_match_stats
+                WHERE fixture_id IN (
+                    SELECT id FROM fixtures WHERE match_number = ANY(%s)
+                );
+                """,
+                (match_numbers,),
+            )
+            cur.execute(
+                """
                 DELETE FROM predictions
                 WHERE fixture_id IN (
                     SELECT id FROM fixtures WHERE match_number = ANY(%s)
@@ -184,7 +244,7 @@ def seed_database() -> None:
 
             cur.execute(
                 """
-                SELECT f.id AS fixture_id, f.stage, ht.*, at.name AS away_name,
+                SELECT f.id AS fixture_id, f.match_number, f.stage, ht.*, at.name AS away_name,
                        at.fifa_code AS away_fifa_code, at.confederation AS away_confederation,
                        at.fifa_ranking AS away_fifa_ranking, at.elo_rating AS away_elo_rating
                 FROM fixtures f
@@ -292,6 +352,74 @@ def seed_database() -> None:
                     """,
                     (row["fixture_id"],),
                 )
+
+                demo_actual = DEMO_ACTUAL_RESULTS.get(row["match_number"])
+                if demo_actual:
+                    cur.execute(
+                        """
+                        UPDATE fixtures
+                        SET actual_home_score = %s,
+                            actual_away_score = %s,
+                            home_score = %s,
+                            away_score = %s,
+                            home_penalties = %s,
+                            away_penalties = %s,
+                            status = 'completed',
+                            winner_team_id = (SELECT id FROM teams WHERE name = %s),
+                            result_source = 'demo_manual',
+                            last_result_sync = CURRENT_TIMESTAMP,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s;
+                        """,
+                        (
+                            demo_actual["actual_home_score"],
+                            demo_actual["actual_away_score"],
+                            demo_actual["actual_home_score"],
+                            demo_actual["actual_away_score"],
+                            demo_actual["home_penalties"],
+                            demo_actual["away_penalties"],
+                            demo_actual["winner_team_name"],
+                            row["fixture_id"],
+                        ),
+                    )
+                    actual_stats = demo_actual["stats"]
+                    cur.execute(
+                        """
+                        INSERT INTO actual_match_stats (
+                            fixture_id,
+                            home_shots,
+                            away_shots,
+                            home_shots_on_target,
+                            away_shots_on_target,
+                            home_possession,
+                            away_possession,
+                            home_corners,
+                            away_corners,
+                            home_yellow_cards,
+                            away_yellow_cards,
+                            home_red_cards,
+                            away_red_cards,
+                            source,
+                            last_sync
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'demo_manual', CURRENT_TIMESTAMP);
+                        """,
+                        (
+                            row["fixture_id"],
+                            actual_stats["home_shots"],
+                            actual_stats["away_shots"],
+                            actual_stats["home_shots_on_target"],
+                            actual_stats["away_shots_on_target"],
+                            actual_stats["home_possession"],
+                            actual_stats["away_possession"],
+                            actual_stats["home_corners"],
+                            actual_stats["away_corners"],
+                            actual_stats["home_yellow_cards"],
+                            actual_stats["away_yellow_cards"],
+                            actual_stats["home_red_cards"],
+                            actual_stats["away_red_cards"],
+                        ),
+                    )
 
         conn.commit()
         print(f"Seed data loaded: {len(TEAMS)} teams, {len(FIXTURES)} knockout fixtures")

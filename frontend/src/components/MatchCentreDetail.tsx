@@ -22,6 +22,7 @@ interface Props {
 export default function MatchCentreDetail({ fixture, prediction, consensus, bookmakerOdds, stats, watch }: Props) {
   const modelFavourite = prediction.home_win_probability >= prediction.away_win_probability ? fixture.home_team_name : fixture.away_team_name;
   const marketFavourite = (consensus?.home_probability ?? 0) >= (consensus?.away_probability ?? 0) ? fixture.home_team_name : fixture.away_team_name;
+  const hasActualScore = fixture.actual_home_score != null && fixture.actual_away_score != null;
   const modelMarketMessage = consensus
     ? modelFavourite === marketFavourite
       ? `Model and market both lean toward ${modelFavourite}.`
@@ -84,7 +85,7 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
       </section>
 
       <PredictedStatsPanel homeTeam={fixture.home_team_name} awayTeam={fixture.away_team_name} stats={stats?.predicted ?? stats?.predicted_stats ?? null} />
-      <ActualStatsPanel stats={stats?.actual ?? stats?.actual_stats ?? null} />
+      <ActualStatsPanel stats={stats?.actual ?? stats?.actual_stats ?? null} hasActualScore={hasActualScore} />
       <StatsComparisonTable predicted={stats?.predicted ?? stats?.predicted_stats ?? null} actual={stats?.actual ?? stats?.actual_stats ?? null} />
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">

@@ -58,6 +58,23 @@ PREDICTED_STATS = {
     "clean_sheet_away_probability": 0.16,
 }
 
+ACTUAL_STATS = {
+    "fixture_id": 1,
+    "home_shots": 12,
+    "away_shots": 8,
+    "home_shots_on_target": 5,
+    "away_shots_on_target": 3,
+    "home_possession": 55.0,
+    "away_possession": 45.0,
+    "home_corners": 6,
+    "away_corners": 2,
+    "home_yellow_cards": 1,
+    "away_yellow_cards": 2,
+    "home_red_cards": 0,
+    "away_red_cards": 0,
+    "source": "manual_demo",
+}
+
 
 def test_health_endpoint(client):
     response = client.get("/health")
@@ -267,6 +284,104 @@ def test_fixture_stats_endpoint_returns_expected_fields(client, monkeypatch):
         "away_possession",
         "over_2_5_goals_probability",
     }.issubset(payload["predicted_stats"])
+
+
+def test_fixture_stats_endpoint_returns_actual_stats_when_inserted(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+    monkeypatch.setattr(fixtures_route.stats_prediction_service, "get_predicted_match_stats", lambda fixture_id: PREDICTED_STATS)
+    monkeypatch.setattr(fixtures_route.stats_prediction_service, "get_actual_match_stats", lambda fixture_id: ACTUAL_STATS)
+
+    response = client.get("/api/fixtures/1/stats")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["actual"]["home_shots"] == 12
+    assert payload["actual_stats"]["source"] == "manual_demo"
+
+
+def test_actual_stats_upsert_endpoint_returns_saved_stats(client, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+
+    def fake_upsert(fixture_id, stats, source):
+        captured["fixture_id"] = fixture_id
+        captured["stats"] = stats
+        captured["source"] = source
+        return {**stats, "fixture_id": fixture_id, "source": source}
+
+    monkeypatch.setattr(fixtures_route.queries, "upsert_actual_match_stats", fake_upsert)
+
+    response = client.post("/api/fixtures/1/actual-stats", json={k: v for k, v in ACTUAL_STATS.items() if k != "fixture_id"})
+    payload = response.get_json()
+
+    assert response.status_code == 201
+    assert captured["fixture_id"] == 1
+    assert captured["source"] == "manual_demo"
+    assert payload["home_shots"] == 12
+
+
+def test_actual_stats_endpoint_validates_possession_total(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+    payload = {k: v for k, v in ACTUAL_STATS.items() if k != "fixture_id"}
+    payload["away_possession"] = 40
+
+    response = client.post("/api/fixtures/1/actual-stats", json=payload)
+
+    assert response.status_code == 400
+    assert "add up to 100" in response.get_json()["error"]
+
+
+def test_actual_stats_endpoint_validates_shots_on_target(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+    payload = {k: v for k, v in ACTUAL_STATS.items() if k != "fixture_id"}
+    payload["home_shots_on_target"] = 13
+
+    response = client.post("/api/fixtures/1/actual-stats", json=payload)
+
+    assert response.status_code == 400
+    assert "cannot exceed home_shots" in response.get_json()["error"]
+
+
+def test_actual_stats_endpoint_validates_non_negative_cards(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+    payload = {k: v for k, v in ACTUAL_STATS.items() if k != "fixture_id"}
+    payload["away_red_cards"] = -1
+
+    response = client.post("/api/fixtures/1/actual-stats", json=payload)
+
+    assert response.status_code == 400
+    assert "cannot be negative" in response.get_json()["error"]
+
+
+def test_result_update_endpoint_updates_score_and_status(client, monkeypatch):
+    monkeypatch.setattr(fixtures_route.queries, "get_fixture_by_id", lambda fixture_id: FIXTURE)
+
+    def fake_update_fixture_result(**kwargs):
+        return {
+            "id": kwargs["fixture_id"],
+            "actual_home_score": kwargs["actual_home_score"],
+            "actual_away_score": kwargs["actual_away_score"],
+            "status": kwargs["status"],
+            "winner_team_id": 1,
+        }
+
+    monkeypatch.setattr(fixtures_route.results_service, "update_fixture_result", fake_update_fixture_result)
+
+    response = client.post(
+        "/api/fixtures/1/result",
+        json={
+            "actual_home_score": 2,
+            "actual_away_score": 1,
+            "status": "completed",
+            "winner_team_name": "Brazil",
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["actual_home_score"] == 2
+    assert payload["actual_away_score"] == 1
+    assert payload["status"] == "completed"
 
 
 def test_fixture_watch_endpoint_returns_links(client, monkeypatch):

@@ -613,6 +613,99 @@ def get_actual_match_stats(fixture_id: int) -> dict[str, Any] | None:
         return cur.fetchone()
 
 
+def upsert_actual_match_stats(
+    fixture_id: int,
+    stats: dict[str, Any],
+    source: str = "manual_demo",
+) -> dict[str, Any]:
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            WITH latest AS (
+                SELECT id
+                FROM actual_match_stats
+                WHERE fixture_id = %s
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ),
+            updated AS (
+                UPDATE actual_match_stats
+                SET home_shots = %s,
+                    away_shots = %s,
+                    home_shots_on_target = %s,
+                    away_shots_on_target = %s,
+                    home_possession = %s,
+                    away_possession = %s,
+                    home_corners = %s,
+                    away_corners = %s,
+                    home_yellow_cards = %s,
+                    away_yellow_cards = %s,
+                    home_red_cards = %s,
+                    away_red_cards = %s,
+                    source = %s,
+                    last_sync = CURRENT_TIMESTAMP
+                WHERE id = (SELECT id FROM latest)
+                RETURNING id
+            )
+            INSERT INTO actual_match_stats (
+                fixture_id,
+                home_shots,
+                away_shots,
+                home_shots_on_target,
+                away_shots_on_target,
+                home_possession,
+                away_possession,
+                home_corners,
+                away_corners,
+                home_yellow_cards,
+                away_yellow_cards,
+                home_red_cards,
+                away_red_cards,
+                source,
+                last_sync
+            )
+            SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP
+            WHERE NOT EXISTS (SELECT 1 FROM updated);
+            """,
+            (
+                fixture_id,
+                stats["home_shots"],
+                stats["away_shots"],
+                stats["home_shots_on_target"],
+                stats["away_shots_on_target"],
+                stats["home_possession"],
+                stats["away_possession"],
+                stats["home_corners"],
+                stats["away_corners"],
+                stats["home_yellow_cards"],
+                stats["away_yellow_cards"],
+                stats["home_red_cards"],
+                stats["away_red_cards"],
+                source,
+                fixture_id,
+                stats["home_shots"],
+                stats["away_shots"],
+                stats["home_shots_on_target"],
+                stats["away_shots_on_target"],
+                stats["home_possession"],
+                stats["away_possession"],
+                stats["home_corners"],
+                stats["away_corners"],
+                stats["home_yellow_cards"],
+                stats["away_yellow_cards"],
+                stats["home_red_cards"],
+                stats["away_red_cards"],
+                source,
+            ),
+        )
+    conn.commit()
+    return get_actual_match_stats(fixture_id)
+
+
+insert_or_update_actual_match_stats = upsert_actual_match_stats
+
+
 def get_watch_links(fixture_id: int) -> list[dict[str, Any]]:
     with get_dict_cursor() as cur:
         cur.execute(

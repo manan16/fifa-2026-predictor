@@ -1,25 +1,31 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import AnimatedPage from "../components/AnimatedPage";
-import MatchCentre from "../components/MatchCentre";
-import { getFixture, getFixtureOdds, getPrediction } from "../services/api";
-import { Fixture, OddsConsensus, Prediction } from "../types";
+import MatchCentreDetail from "../components/MatchCentreDetail";
+import { getFixture, getFixtureOdds, getFixtureStats, getFixtureWatchLinks, getPrediction } from "../services/api";
+import { BookmakerOdds, Fixture, FixtureStatsResponse, FixtureWatchResponse, OddsConsensus, Prediction } from "../types";
 
 export default function MatchPrediction() {
   const { fixtureId } = useParams();
   const [fixture, setFixture] = useState<Fixture | null>(null);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [consensus, setConsensus] = useState<OddsConsensus | null>(null);
+  const [bookmakerOdds, setBookmakerOdds] = useState<BookmakerOdds[]>([]);
+  const [stats, setStats] = useState<FixtureStatsResponse | null>(null);
+  const [watch, setWatch] = useState<FixtureWatchResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!fixtureId) return;
     const id = Number(fixtureId);
-    Promise.all([getFixture(id), getPrediction(id), getFixtureOdds(id)])
-      .then(([fixtureData, predictionData, oddsData]) => {
+    Promise.all([getFixture(id), getPrediction(id), getFixtureOdds(id), getFixtureStats(id), getFixtureWatchLinks(id)])
+      .then(([fixtureData, predictionData, oddsData, statsData, watchData]) => {
         setFixture(fixtureData);
         setPrediction(predictionData);
         setConsensus(oddsData.consensus);
+        setBookmakerOdds(oddsData.odds);
+        setStats(statsData);
+        setWatch(watchData);
       })
       .catch(() => setError("Unable to load this match centre."));
   }, [fixtureId]);
@@ -38,13 +44,14 @@ export default function MatchPrediction() {
 
   return (
     <AnimatedPage className="space-y-5">
-      <Link
-        to="/fixtures"
-        className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-chalk-dim transition hover:text-gold"
-      >
-        ‹ Back to fixtures
-      </Link>
-      <MatchCentre fixture={fixture} prediction={prediction} consensus={consensus} />
+      <MatchCentreDetail
+        fixture={fixture}
+        prediction={prediction}
+        consensus={consensus}
+        bookmakerOdds={bookmakerOdds}
+        stats={stats}
+        watch={watch}
+      />
       <p className="font-mono text-[11px] tracking-[0.06em] text-chalk-dim">
         Model vs market analytics. Not betting advice.
       </p>

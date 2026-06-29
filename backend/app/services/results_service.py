@@ -9,7 +9,37 @@ from app.db.connection import get_connection
 def fetch_latest_results() -> list[dict[str, Any]]:
     if not os.getenv("RESULTS_API_KEY") or not os.getenv("RESULTS_API_BASE_URL"):
         return []
-    # TODO: Integrate API-Football or another licensed results provider here.
+    # TODO: Integrate a licensed, verified results provider here.
+    # Expected normalized result shape:
+    # {
+    #     "fixture_id": int,
+    #     "actual_home_score": int,
+    #     "actual_away_score": int,
+    #     "status": "completed" | "live" | "scheduled",
+    #     "winner_team_name": str | None,
+    #     "home_penalties": int | None,
+    #     "away_penalties": int | None,
+    #     "actual_stats": {
+    #         "home_shots": int,
+    #         "away_shots": int,
+    #         "home_shots_on_target": int,
+    #         "away_shots_on_target": int,
+    #         "home_possession": float,
+    #         "away_possession": float,
+    #         "home_corners": int,
+    #         "away_corners": int,
+    #         "home_yellow_cards": int,
+    #         "away_yellow_cards": int,
+    #         "home_red_cards": int,
+    #         "away_red_cards": int,
+    #     } | None,
+    #     "source": str,
+    # }
+    # TODO: Map provider fixture IDs to local fixtures before calling
+    # update_fixture_result() and queries.upsert_actual_match_stats().
+    # TODO: Map external stat names and units to actual_match_stats fields,
+    # then run the same possession, shot, and card validation used by the
+    # manual endpoint before saving.
     return []
 
 
