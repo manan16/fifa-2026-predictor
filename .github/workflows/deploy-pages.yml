@@ -44,7 +44,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: https://fifa-2026-predictor-2.onrender.com
 
       - name: Disable Jekyll processing
         run: touch dist/.nojekyll

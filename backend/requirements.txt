@@ -6,4 +6,4 @@ pandas
 scikit-learn
 pytest
 pytest-flask
-
+gunicorn
