@@ -160,11 +160,27 @@ def generate_predicted_match_stats(home_team: dict[str, Any], away_team: dict[st
 
 
 def blend_model_and_market_probabilities(model_probs: dict[str, float], market_probs: dict[str, float] | None, market_weight: float = 0.3) -> dict[str, float]:
-    return model_probs if not market_probs else model_probs
+    if not market_probs:
+        return model_probs
+    model_weight = 1 - market_weight
+    blended = {key: round(model_probs[key] * model_weight + market_probs[key] * market_weight, 4) for key in ("home", "draw", "away")}
+    blended["draw"] = round(blended["draw"] + round(1 - sum(blended.values()), 4), 4)
+    return blended
 
 
 def compare_model_to_market(model_probs: dict[str, float], market_probs: dict[str, float] | None) -> dict[str, Any]:
-    return {"disagreement": False, "message": "Model-only baseline is shown for this prediction."}
+    if not market_probs:
+        return {"disagreement": False, "message": "No market consensus is available yet."}
+    labels = {"home": "home team", "draw": "draw", "away": "away team"}
+    model_pick = max(model_probs, key=model_probs.get)
+    market_pick = max(market_probs, key=market_probs.get)
+    if model_pick != market_pick:
+        return {"disagreement": True, "message": f"Model favours {labels[model_pick]} while the market favours {labels[market_pick]}."}
+    gap = model_probs[model_pick] - market_probs[market_pick]
+    if abs(gap) >= 0.08:
+        direction = "more strongly" if gap > 0 else "less strongly"
+        return {"disagreement": True, "message": f"Model favours the {labels[model_pick]} {direction} than the market."}
+    return {"disagreement": False, "message": "Model and market broadly agree on the favourite."}
 
 
 def generate_explanation(home_team: dict[str, Any], away_team: dict[str, Any], features: dict[str, float], probabilities: dict[str, float]) -> list[str]:
@@ -203,6 +219,7 @@ def predict_match(home_team: dict[str, Any], away_team: dict[str, Any], stage: s
     total = home_win + draw + away_win
     probabilities = {"home": round(home_win / total, 4), "draw": round(draw / total, 4), "away": round(away_win / total, 4)}
     probabilities["draw"] = round(probabilities["draw"] + round(1.0 - sum(probabilities.values()), 4), 4)
+    market_comparison = compare_model_to_market(probabilities, market_probs)
     output_probs = blend_model_and_market_probabilities(probabilities, market_probs)
     response: dict[str, Any] = {
         "home_team": home_team["name"],
@@ -219,7 +236,7 @@ def predict_match(home_team: dict[str, Any], away_team: dict[str, Any], stage: s
         "away_xg": round(away_xg, 2),
         "predicted_stats": generate_predicted_match_stats(home_team, away_team, home_xg, away_xg, home_strength, away_strength, stage=stage),
         "confidence": calculate_confidence(output_probs),
-        "market_comparison": compare_model_to_market(probabilities, market_probs),
+        "market_comparison": market_comparison,
         "explanation": generate_explanation(home_team, away_team, {"strength_diff": home_strength - away_strength, "home_xg": home_xg, "away_xg": away_xg, "home_advantage": home_advantage}, output_probs),
         "model_version": MODEL_VERSION,
     }
