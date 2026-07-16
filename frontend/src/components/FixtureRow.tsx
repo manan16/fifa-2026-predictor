@@ -7,7 +7,7 @@ function kickoffTime(value?: string): string {
   if (!value) return "TBC";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "TBC";
-  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(date);
+  return `${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(date)} GMT`;
 }
 
 export default function FixtureRow({ fixture }: { fixture: Fixture }) {

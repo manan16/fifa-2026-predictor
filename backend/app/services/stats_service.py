@@ -3,10 +3,10 @@
 Wikipedia content is licensed CC BY-SA, so reuse is fine *with attribution*.
 We pull World Cup 2026 match data from the stable MediaWiki ``action=parse``
 API (NOT by scraping rendered CSS, which is brittle) and parse the
-``{{Football box}}`` templates that the encyclopedia reliably carries: the
-score, the goalscorer lists, and cards where present. Possession, shots,
-shots on target, corners and xG are usually absent on Wikipedia football boxes
-and are left ``NULL`` rather than fabricated.
+``{{Football box}}`` / ``{{#invoke:football box|main}}`` templates that the
+encyclopedia reliably carries: the score, the goalscorer lists, and cards where
+present. Possession, shots, shots on target, corners and xG are usually absent
+on Wikipedia football boxes and are left ``NULL`` rather than fabricated.
 
 The pipeline is deliberately defensive: any single page or match that fails to
 fetch/parse is logged and skipped, never fatal to the whole run.
@@ -20,6 +20,7 @@ from typing import Any
 import requests
 
 from app.db.connection import get_connection, get_dict_cursor
+from app.services import results_service
 
 # Wikipedia requires a descriptive User-Agent that identifies the application.
 USER_AGENT = (
@@ -33,6 +34,7 @@ WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 # Wikipedia (few calls per run).
 WIKIPEDIA_PAGES = (
     "2026 FIFA World Cup knockout stage",
+    "2026 FIFA World Cup round of 32",
 )
 
 # Map Wikipedia's team names onto the names seeded in our ``teams`` table.
@@ -56,6 +58,41 @@ _TEAM_NAME_ALIASES = {
     "côte d'ivoire": "Ivory Coast",
     "cote d'ivoire": "Ivory Coast",
     "côte d’ivoire": "Ivory Coast",
+}
+
+_TEAM_CODE_ALIASES = {
+    "ALG": "Algeria",
+    "ARG": "Argentina",
+    "AUS": "Australia",
+    "AUT": "Austria",
+    "BEL": "Belgium",
+    "BIH": "Bosnia-Herz",
+    "BRA": "Brazil",
+    "CAN": "Canada",
+    "CIV": "Ivory Coast",
+    "COD": "Congo DR",
+    "COL": "Colombia",
+    "CPV": "Cape Verde",
+    "CRO": "Croatia",
+    "ECU": "Ecuador",
+    "EGY": "Egypt",
+    "ENG": "England",
+    "ESP": "Spain",
+    "FRA": "France",
+    "GER": "Germany",
+    "GHA": "Ghana",
+    "JPN": "Japan",
+    "MAR": "Morocco",
+    "MEX": "Mexico",
+    "NED": "Netherlands",
+    "NOR": "Norway",
+    "PAR": "Paraguay",
+    "POR": "Portugal",
+    "RSA": "South Africa",
+    "SEN": "Senegal",
+    "SUI": "Switzerland",
+    "SWE": "Sweden",
+    "USA": "USA",
 }
 
 # team_match_stats columns we write (id/created_at are managed by the table).
@@ -85,6 +122,10 @@ _ABSENT_METRICS = {
 }
 
 _SCORE_RE = re.compile(r"(\d+)\s*[–\-]\s*(\d+)")
+_MATCH_NUMBER_RES = (
+    re.compile(r"\bMatch\s+(\d+)\b", re.IGNORECASE),
+    re.compile(r"\bM(\d{2,3})-[A-Z]{2,3}-V-[A-Z]{2,3}\b", re.IGNORECASE),
+)
 _YELLOW_CARD_RE = re.compile(r"\{\{\s*(?:yel|yellow card|yellow-card)\b", re.IGNORECASE)
 _RED_CARD_RE = re.compile(
     r"\{\{\s*(?:sent off|red card|red-card|yellow-red card|second yellow|rc)\b",
@@ -97,8 +138,28 @@ def _clean(value: str | None) -> str:
     if not value:
         return ""
     text = value.strip()
-    # Drop {{flagicon|...}} / {{fb|XXX}} style flag templates entirely.
-    text = re.sub(r"\{\{\s*(?:flagicon|fb|fbicon|flagathlete)[^{}]*\}\}", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+
+    def replace_flag_module(match: re.Match[str]) -> str:
+        code = match.group(1).upper()
+        return _TEAM_CODE_ALIASES.get(code, code)
+
+    def replace_flag_template(match: re.Match[str]) -> str:
+        code = match.group(1).upper()
+        return _TEAM_CODE_ALIASES.get(code, "")
+
+    text = re.sub(
+        r"\{\{\s*#invoke:flag\s*\|\s*[^|{}]+\s*\|\s*([A-Z]{2,3})\s*(?:\|[^{}]*)?\}\}",
+        replace_flag_module,
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"\{\{\s*(?:fb|fb-rt|fbicon|flagicon|flagathlete)\s*\|\s*([A-Z]{2,3})[^{}]*\}\}",
+        replace_flag_template,
+        text,
+        flags=re.IGNORECASE,
+    )
     # Reduce [[Target|Label]] -> Label and [[Target]] -> Target.
     text = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]+)\]\]", r"\1", text)
     # Drop any remaining templates and stray markup.
@@ -174,12 +235,20 @@ def _parse_template_params(body: str) -> dict[str, str]:
 
 
 def extract_football_boxes(wikitext: str) -> list[dict[str, str]]:
-    """Find every ``{{Football box...}}`` template and return its params."""
+    """Find every football-box template or Lua invocation and return params."""
     boxes: list[dict[str, str]] = []
     lowered = wikitext.lower()
     search_from = 0
     while True:
-        start = lowered.find("{{football box", search_from)
+        starts = [
+            position
+            for position in (
+                lowered.find("{{football box", search_from),
+                lowered.find("{{#invoke:football box", search_from),
+            )
+            if position != -1
+        ]
+        start = min(starts) if starts else -1
         if start == -1:
             break
         # Walk forward to the matching closing braces.
@@ -211,10 +280,25 @@ def extract_football_boxes(wikitext: str) -> list[dict[str, str]]:
 def _parse_score(score: str | None) -> tuple[int | None, int | None]:
     if not score:
         return (None, None)
-    match = _SCORE_RE.search(_clean(score))
+    match = _SCORE_RE.search(score)
+    if not match:
+        match = _SCORE_RE.search(_clean(score))
     if not match:
         return (None, None)
     return (int(match.group(1)), int(match.group(2)))
+
+
+def _parse_penalty_score(score: str | None) -> tuple[int | None, int | None]:
+    return _parse_score(score)
+
+
+def _parse_match_number(score: str | None, report: str | None = None) -> int | None:
+    text = " ".join(part for part in (score, report) if part)
+    for pattern in _MATCH_NUMBER_RES:
+        match = pattern.search(text)
+        if match:
+            return int(match.group(1))
+    return None
 
 
 def _count_cards(text: str | None) -> tuple[int, int]:
@@ -234,22 +318,32 @@ def parse_football_box(params: dict[str, str]) -> dict[str, Any] | None:
     if not team1 or not team2:
         return None
 
+    fifa_match_number = _parse_match_number(params.get("score"), params.get("report"))
     home_score, away_score = _parse_score(params.get("score"))
+    home_penalties, away_penalties = _parse_penalty_score(params.get("penaltyscore"))
     home_yellow, home_red = _count_cards(params.get("goals1"))
     away_yellow, away_red = _count_cards(params.get("goals2"))
 
     return {
+        "fifa_match_number": fifa_match_number,
         "team1": team1,
         "team2": team2,
         "team1_goals_for": home_score,
         "team1_goals_against": away_score,
         "team2_goals_for": away_score,
         "team2_goals_against": home_score,
+        "team1_penalties": home_penalties,
+        "team2_penalties": away_penalties,
         "team1_yellow_cards": home_yellow,
         "team1_red_cards": home_red,
         "team2_yellow_cards": away_yellow,
         "team2_red_cards": away_red,
     }
+
+
+def is_placeholder_team(name: str | None) -> bool:
+    normalized = normalize_team_name(name).lower()
+    return normalized.startswith("winner match") or normalized.startswith("loser match")
 
 
 def _fetch_wikitext(page_title: str) -> str:
@@ -313,6 +407,164 @@ def _load_fixtures() -> list[dict[str, Any]]:
         return list(cur.fetchall())
 
 
+def _stage_for_fifa_match(match_number: int | None) -> str | None:
+    if match_number is None:
+        return None
+    if 73 <= match_number <= 88:
+        return "Round of 32"
+    if 89 <= match_number <= 96:
+        return "Round of 16"
+    if 97 <= match_number <= 100:
+        return "Quarter-final"
+    if 101 <= match_number <= 102:
+        return "Semi-final"
+    if match_number == 103:
+        return "Third-place play-off"
+    if match_number == 104:
+        return "Final"
+    return None
+
+
+def upsert_wikipedia_fixture(match: dict[str, Any]) -> dict[str, Any] | None:
+    """Create/update the real fixture row represented by a Wikipedia box."""
+    match_number = match.get("fifa_match_number")
+    stage = _stage_for_fifa_match(match_number)
+    if match_number is None or stage is None:
+        return None
+    if is_placeholder_team(match.get("team1")) or is_placeholder_team(match.get("team2")):
+        return None
+
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, home_team_id, away_team_id
+            FROM fixtures
+            WHERE external_event_id = %s;
+            """,
+            (f"wikipedia-match-{match_number}",),
+        )
+        existing = cur.fetchone()
+        if existing:
+            cur.execute(
+                """
+                UPDATE fixtures
+                SET match_number = %s,
+                    stage = %s,
+                    group_name = 'Wikipedia fixtures',
+                    home_team_id = (SELECT id FROM teams WHERE name = %s),
+                    away_team_id = (SELECT id FROM teams WHERE name = %s),
+                    status = CASE
+                        WHEN %s::integer IS NULL OR %s::integer IS NULL THEN 'scheduled'
+                        ELSE 'completed'
+                    END,
+                    actual_home_score = %s,
+                    actual_away_score = %s,
+                    home_score = %s,
+                    away_score = %s,
+                    home_penalties = %s,
+                    away_penalties = %s,
+                    winner_team_id = CASE
+                        WHEN %s::text IS NULL THEN NULL
+                        ELSE (SELECT id FROM teams WHERE name = %s)
+                    END,
+                    result_source = 'wikipedia',
+                    last_result_sync = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                RETURNING id, home_team_id, away_team_id,
+                          (SELECT name FROM teams WHERE id = home_team_id) AS home_team_name,
+                          (SELECT name FROM teams WHERE id = away_team_id) AS away_team_name;
+                """,
+                (
+                    match_number,
+                    stage,
+                    match["team1"],
+                    match["team2"],
+                    match["team1_goals_for"],
+                    match["team2_goals_for"],
+                    match["team1_goals_for"],
+                    match["team2_goals_for"],
+                    match["team1_goals_for"],
+                    match["team2_goals_for"],
+                    match["team1_penalties"],
+                    match["team2_penalties"],
+                    match.get("winner_team_name"),
+                    match.get("winner_team_name"),
+                    existing["id"],
+                ),
+            )
+            result = cur.fetchone()
+        else:
+            cur.execute(
+                """
+                INSERT INTO fixtures (
+                    match_number,
+                    stage,
+                    group_name,
+                    home_team_id,
+                    away_team_id,
+                    venue,
+                    city,
+                    status,
+                    actual_home_score,
+                    actual_away_score,
+                    home_score,
+                    away_score,
+                    home_penalties,
+                    away_penalties,
+                    winner_team_id,
+                    external_event_id,
+                    result_source,
+                    last_result_sync
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    'Wikipedia fixtures',
+                    (SELECT id FROM teams WHERE name = %s),
+                    (SELECT id FROM teams WHERE name = %s),
+                    'World Cup 2026',
+                    'Wikipedia',
+                    CASE WHEN %s::integer IS NULL OR %s::integer IS NULL THEN 'scheduled' ELSE 'completed' END,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    CASE WHEN %s::text IS NULL THEN NULL ELSE (SELECT id FROM teams WHERE name = %s) END,
+                    %s,
+                    'wikipedia',
+                    CURRENT_TIMESTAMP
+                )
+                RETURNING id, home_team_id, away_team_id,
+                          (SELECT name FROM teams WHERE id = home_team_id) AS home_team_name,
+                          (SELECT name FROM teams WHERE id = away_team_id) AS away_team_name;
+                """,
+                (
+                    match_number,
+                    stage,
+                    match["team1"],
+                    match["team2"],
+                    match["team1_goals_for"],
+                    match["team2_goals_for"],
+                    match["team1_goals_for"],
+                    match["team2_goals_for"],
+                    match["team1_goals_for"],
+                    match["team2_goals_for"],
+                    match["team1_penalties"],
+                    match["team2_penalties"],
+                    match.get("winner_team_name"),
+                    match.get("winner_team_name"),
+                    f"wikipedia-match-{match_number}",
+                ),
+            )
+            result = cur.fetchone()
+    conn.commit()
+    return result
+
+
 def match_to_fixture(match: dict[str, Any], fixtures: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Find the seeded fixture for a parsed match by normalized team names."""
     team1 = match["team1"].lower()
@@ -352,6 +604,39 @@ def build_team_stats(match: dict[str, Any], fixture: dict[str, Any]) -> tuple[di
     return home_stats, away_stats
 
 
+def build_fixture_result(match: dict[str, Any], fixture: dict[str, Any]) -> dict[str, Any] | None:
+    """Orient a parsed Wikipedia score onto the local fixture home/away sides."""
+    if match["team1_goals_for"] is None or match["team2_goals_for"] is None:
+        return None
+
+    home_name = normalize_team_name(fixture.get("home_team_name")).lower()
+    if match["team1"].lower() == home_name:
+        home_prefix, away_prefix = "team1", "team2"
+    else:
+        home_prefix, away_prefix = "team2", "team1"
+
+    home_score = match[f"{home_prefix}_goals_for"]
+    away_score = match[f"{away_prefix}_goals_for"]
+    home_penalties = match.get(f"{home_prefix}_penalties")
+    away_penalties = match.get(f"{away_prefix}_penalties")
+    winner_team_name = None
+    if home_score > away_score:
+        winner_team_name = fixture.get("home_team_name")
+    elif away_score > home_score:
+        winner_team_name = fixture.get("away_team_name")
+    elif home_penalties is not None and away_penalties is not None:
+        winner_team_name = fixture.get("home_team_name") if home_penalties > away_penalties else fixture.get("away_team_name")
+
+    return {
+        "actual_home_score": home_score,
+        "actual_away_score": away_score,
+        "status": "completed",
+        "winner_team_name": winner_team_name,
+        "home_penalties": home_penalties,
+        "away_penalties": away_penalties,
+    }
+
+
 def upsert_team_match_stats(
     fixture_id: int,
     home_stats: dict[str, Any],
@@ -384,15 +669,41 @@ def sync_wikipedia_match_stats() -> int:
     or persist is logged and skipped, never fatal to the run.
     """
     fixtures = _load_fixtures()
-    if not fixtures:
-        return 0
 
     records = 0
     for match in fetch_match_stats():
         try:
+            if match["team1_goals_for"] is not None and match["team2_goals_for"] is not None:
+                if match["team1_goals_for"] > match["team2_goals_for"]:
+                    match["winner_team_name"] = match["team1"]
+                elif match["team2_goals_for"] > match["team1_goals_for"]:
+                    match["winner_team_name"] = match["team2"]
+                elif match["team1_penalties"] is not None and match["team2_penalties"] is not None:
+                    match["winner_team_name"] = match["team1"] if match["team1_penalties"] > match["team2_penalties"] else match["team2"]
+                else:
+                    match["winner_team_name"] = None
+
+            wiki_fixture = upsert_wikipedia_fixture(match)
+            if wiki_fixture:
+                home_stats, away_stats = build_team_stats(match, wiki_fixture)
+                upsert_team_match_stats(wiki_fixture["id"], home_stats, away_stats)
+                records += 1
+                continue
+
             fixture = match_to_fixture(match, fixtures)
             if fixture is None:
                 continue
+            result = build_fixture_result(match, fixture)
+            if result:
+                results_service.update_fixture_result(
+                    fixture_id=fixture["id"],
+                    actual_home_score=result["actual_home_score"],
+                    actual_away_score=result["actual_away_score"],
+                    status=result["status"],
+                    winner_team_name=result["winner_team_name"],
+                    home_penalties=result["home_penalties"],
+                    away_penalties=result["away_penalties"],
+                )
             home_stats, away_stats = build_team_stats(match, fixture)
             upsert_team_match_stats(fixture["id"], home_stats, away_stats)
             records += 1

@@ -39,7 +39,7 @@ CAPE_VERDE = {"name": "Cape Verde", "fifa_ranking": 65, "elo_rating": 1590}
 
 def test_predict_match_returns_valid_probabilities():
     prediction = predict_match(
-        {"name": "Brazil", "fifa_ranking": 5, "elo_rating": 2130},
+        {"name": "Brazil", "fifa_ranking": 6, "elo_rating": 2130},
         {"name": "Japan", "fifa_ranking": 18, "elo_rating": 1875},
     )
 
@@ -85,7 +85,7 @@ def test_even_match_does_not_create_spurious_blowout():
 
 
 def test_stronger_favourite_does_not_lose_goals_or_win_probability():
-    favourite = {"name": "Brazil", "fifa_ranking": 5, "elo_rating": 2130}
+    favourite = {"name": "Brazil", "fifa_ranking": 6, "elo_rating": 2130}
     stronger_favourite = {"name": "Brazil", "fifa_ranking": 1, "elo_rating": 2250}
     underdog = {"name": "Japan", "fifa_ranking": 18, "elo_rating": 1875}
 
@@ -112,7 +112,7 @@ def test_seeded_fixture_scorelines_do_not_collapse_to_one_result():
 
 def test_predicted_match_stats_return_required_fields_and_constraints():
     prediction = predict_match(
-        {"name": "Brazil", "fifa_ranking": 5, "elo_rating": 2130},
+        {"name": "Brazil", "fifa_ranking": 6, "elo_rating": 2130},
         {"name": "Japan", "fifa_ranking": 18, "elo_rating": 1875},
         stage="Round of 32",
     )

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { BookmakerOdds, Fixture, FixtureMatchStatsResponse, FixtureStatsResponse, FixtureWatchResponse, OddsConsensus, Prediction } from "../types";
-import ActualStatsPanel from "./ActualStatsPanel";
 import MatchCentreHeader from "./MatchCentreHeader";
 import MarketSummaryCard from "./MarketSummaryCard";
 import PredictedStatsPanel from "./PredictedStatsPanel";
@@ -86,9 +85,14 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
         <MarketSummaryCard prediction={prediction} consensus={consensus} message={modelMarketMessage} />
       </section>
 
-      <StatsPanel homeTeam={fixture.home_team_name} awayTeam={fixture.away_team_name} stats={matchStats} />
+      <StatsPanel
+        homeTeam={fixture.home_team_name}
+        awayTeam={fixture.away_team_name}
+        stats={matchStats}
+        actualStats={stats?.actual ?? stats?.actual_stats ?? null}
+        hasActualScore={hasActualScore}
+      />
       <PredictedStatsPanel homeTeam={fixture.home_team_name} awayTeam={fixture.away_team_name} stats={stats?.predicted ?? stats?.predicted_stats ?? null} />
-      <ActualStatsPanel stats={stats?.actual ?? stats?.actual_stats ?? null} hasActualScore={hasActualScore} />
       <StatsComparisonTable predicted={stats?.predicted ?? stats?.predicted_stats ?? null} actual={stats?.actual ?? stats?.actual_stats ?? null} />
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">

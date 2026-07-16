@@ -10,7 +10,7 @@ TEAM = {
     "name": "Brazil",
     "fifa_code": "BRA",
     "confederation": "CONMEBOL",
-    "fifa_ranking": 5,
+    "fifa_ranking": 6,
     "elo_rating": 2130,
 }
 

@@ -1,9 +1,11 @@
-import { FixtureMatchStatsResponse } from "../types";
+import { ActualMatchStats, FixtureMatchStatsResponse } from "../types";
 
 interface Props {
   homeTeam: string;
   awayTeam: string;
   stats: FixtureMatchStatsResponse | null;
+  actualStats?: ActualMatchStats | null;
+  hasActualScore?: boolean;
 }
 
 type Side = "home" | "away";
@@ -51,48 +53,66 @@ function PossessionBar({ home, away }: { home: number | null; away: number | nul
   );
 }
 
-export default function StatsPanel({ homeTeam, awayTeam, stats }: Props) {
+export default function StatsPanel({ homeTeam, awayTeam, stats, actualStats = null, hasActualScore = false }: Props) {
   const home = stats?.home ?? null;
   const away = stats?.away ?? null;
-  if (!home && !away) return null;
 
   const pick = (side: Side, key: keyof NonNullable<typeof home>): number | null => {
     const row = side === "home" ? home : away;
     return row ? numeric(row[key] as number | null) : null;
   };
 
-  const possessionHome = pick("home", "possession");
-  const possessionAway = pick("away", "possession");
+  const pickActual = (homeKey: keyof ActualMatchStats, awayKey: keyof ActualMatchStats): { home: number | null; away: number | null } => ({
+    home: actualStats ? numeric(actualStats[homeKey] as number | null) : null,
+    away: actualStats ? numeric(actualStats[awayKey] as number | null) : null
+  });
+
+  const shots = home || away ? { home: pick("home", "shots"), away: pick("away", "shots") } : pickActual("home_shots", "away_shots");
+  const shotsOnTarget =
+    home || away ? { home: pick("home", "shots_on_target"), away: pick("away", "shots_on_target") } : pickActual("home_shots_on_target", "away_shots_on_target");
+  const corners = home || away ? { home: pick("home", "corners"), away: pick("away", "corners") } : pickActual("home_corners", "away_corners");
+  const yellows =
+    home || away ? { home: pick("home", "yellow_cards"), away: pick("away", "yellow_cards") } : pickActual("home_yellow_cards", "away_yellow_cards");
+  const reds = home || away ? { home: pick("home", "red_cards"), away: pick("away", "red_cards") } : pickActual("home_red_cards", "away_red_cards");
+
+  const possession =
+    home || away ? { home: pick("home", "possession"), away: pick("away", "possession") } : pickActual("home_possession", "away_possession");
 
   const rows = [
-    { label: "Goals", home: pick("home", "goals_for"), away: pick("away", "goals_for"), suffix: "" },
-    { label: "Shots", home: pick("home", "shots"), away: pick("away", "shots"), suffix: "" },
-    { label: "On target", home: pick("home", "shots_on_target"), away: pick("away", "shots_on_target"), suffix: "" },
-    { label: "Corners", home: pick("home", "corners"), away: pick("away", "corners"), suffix: "" },
-    { label: "Yellow cards", home: pick("home", "yellow_cards"), away: pick("away", "yellow_cards"), suffix: "" },
-    { label: "Red cards", home: pick("home", "red_cards"), away: pick("away", "red_cards"), suffix: "" },
-    { label: "xG", home: pick("home", "xg"), away: pick("away", "xg"), suffix: "" }
+    { label: "Goals", home: home || away ? pick("home", "goals_for") : null, away: home || away ? pick("away", "goals_for") : null, suffix: "" },
+    { label: "Shots", home: shots.home, away: shots.away, suffix: "" },
+    { label: "On target", home: shotsOnTarget.home, away: shotsOnTarget.away, suffix: "" },
+    { label: "Corners", home: corners.home, away: corners.away, suffix: "" },
+    { label: "Yellow cards", home: yellows.home, away: yellows.away, suffix: "" },
+    { label: "Red cards", home: reds.home, away: reds.away, suffix: "" },
+    { label: "xG", home: home || away ? pick("home", "xg") : null, away: home || away ? pick("away", "xg") : null, suffix: "" }
   ];
 
   const visibleRows = rows.filter((row) => row.home != null || row.away != null);
-  const hasPossession = possessionHome != null && possessionAway != null;
-  if (!hasPossession && visibleRows.length === 0) return null;
+  const hasPossession = possession.home != null && possession.away != null;
+  const sourceNote = stats?.source_note ?? (actualStats?.source ? `Stats source: ${actualStats.source}.` : "Actual stats are official only when connected to a verified data provider.");
 
   return (
     <section className="border border-white/15 bg-slate-900/85 p-5 shadow-broadcast">
-      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-300">Match stats</p>
+      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-300">Actual match stats</p>
       <div className="mt-3 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.14em] text-chalk-dim">
         <span className="font-black text-gold">{homeTeam}</span>
         <span className="font-black text-sky-300">{awayTeam}</span>
       </div>
-      <div className="mt-2 divide-y divide-white/5">
-        <PossessionBar home={possessionHome} away={possessionAway} />
-        {visibleRows.map((row) => (
-          <PairedRow key={row.label} label={row.label} home={row.home} away={row.away} suffix={row.suffix} />
-        ))}
-      </div>
+      {hasPossession || visibleRows.length > 0 ? (
+        <div className="mt-2 divide-y divide-white/5">
+          <PossessionBar home={possession.home} away={possession.away} />
+          {visibleRows.map((row) => (
+            <PairedRow key={row.label} label={row.label} home={row.home} away={row.away} suffix={row.suffix} />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 bg-white/[0.06] p-4 font-bold text-slate-300">
+          {hasActualScore ? "Final score available. Detailed match stats not available yet." : "Match not played yet. Actual stats will appear after full time."}
+        </p>
+      )}
       <p className="mt-4 font-mono text-[11px] tracking-[0.06em] text-chalk-dim">
-        Stats via Wikipedia (CC BY-SA).
+        {sourceNote}
       </p>
     </section>
   );

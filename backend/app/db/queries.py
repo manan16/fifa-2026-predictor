@@ -176,6 +176,7 @@ def get_all_fixtures() -> list[dict[str, Any]]:
                 ORDER BY ps.created_at DESC, ps.id DESC
                 LIMIT 1
             ) ps ON true
+            WHERE f.result_source = 'wikipedia'
             ORDER BY f.kickoff_time, f.match_number;
             """
         )
