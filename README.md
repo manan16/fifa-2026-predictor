@@ -113,7 +113,7 @@ The fastest way to run the whole stack (PostgreSQL + Flask backend + React front
 cp .env.example .env
 ```
 
-The defaults work out of the box. `ODDS_API_KEY`/`RESULTS_API_KEY` are optional — without them the app uses illustrative demo odds and synthetic results.
+The defaults work out of the box. `ODDS_API_KEY`/`RESULTS_API_KEY` are optional — without an odds key the app uses illustrative demo odds, while the seeded knockout results are the real 2026 World Cup scores (see "Real WC2026 Knockout Data" below).
 
 ### 2. Build the images
 
@@ -278,14 +278,17 @@ Open `http://localhost:5173/bracket` to view the dark sports-bracket layout. The
 
 The backend groups seeded knockout fixtures by stage, joins each fixture to its home and away teams, and attaches the latest prediction for that fixture. Advance probabilities are derived from the stored 90-minute win/draw/loss probabilities for knockout matches. The predicted winner is the team with the higher advance probability, falling back to the higher 90-minute win probability when advance values are unavailable.
 
-## Honest Demo Data (Option A)
+## Real WC2026 Knockout Data
 
-The seeded knockout bracket is **illustrative demo data**, not a live feed, and it is the **single source of truth** for every page. Two deliberate decisions keep it honest and internally consistent:
+The seeded knockout bracket is the **real 2026 FIFA World Cup knockout stage** — Round of 32 through the Final — and it is the **single source of truth** for every page. Pairings, dates and scores were sourced from the [openfootball/worldcup.json](https://github.com/openfootball/worldcup.json) feed and cross-verified against Wikipedia's [2026 FIFA World Cup knockout stage](https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_knockout_stage) article and match reports (FIFA.com, NBC, Al Jazeera, ESPN). See [`backend/app/db/seed.py`](backend/app/db/seed.py).
 
-- **One canonical fixtures table.** Both the Bracket (`GET /api/bracket`) and the Fixtures list (`GET /api/fixtures`) read the same seeded knockout set (scoped by the `Knockout bracket` / `World Cup 2026` markers in [`backend/app/db/queries.py`](backend/app/db/queries.py)). Because they read identical rows, the two views can never show different semi-final or final pairings. Each round's teams are chained forward from the previous round's actual-or-predicted winner (see [`backend/app/db/seed.py`](backend/app/db/seed.py)).
-- **No Wikipedia binding on synthetic fixtures.** Earlier builds fetched live Wikipedia match stats and bound them onto demo fixtures that don't correspond to real matches, which produced arbitrary results that disagreed with the bracket. That call path is disabled for the demo (`ENABLE_STATS_SYNC` defaults to `false`, and the Fixtures endpoint no longer triggers a Wikipedia refresh). Instead, completed-match scores and stats are **synthetic**, generated from the same Elo/Poisson model and team-strength inputs as the predictions, so scorelines are plausible and never contradict who advances. All such data is labelled `Illustrative demo data` in the UI — no Wikipedia attribution appears on synthetic content.
+Two design decisions keep it honest and internally consistent:
 
-To ingest **real** WC2026 results instead (Option B), point the results/stats sync at a live source and set `ENABLE_STATS_SYNC=true`.
+- **One canonical fixtures table.** Both the Bracket (`GET /api/bracket`) and the Fixtures list (`GET /api/fixtures`) read the same seeded knockout set (scoped by the `Knockout bracket` / `World Cup 2026` markers in [`backend/app/db/queries.py`](backend/app/db/queries.py)). Because they read identical rows, the two views can never disagree on a semi-final or final pairing. Each round's teams are chained forward from the previous round's real winner; the third-place play-off is fed by the two semi-final losers.
+- **Real results only, never fabricated.** Completed matches carry their real final scores (with penalty-shootout and after-extra-time results recorded), and the advancing team is always the real winner of its feeding match. Matches not yet played (at seeding time, only the Final) are left as genuine scheduled fixtures with **no score** rather than an invented result. `result_source` is `openfootball` for completed fixtures.
+- **Detailed match stats are not fabricated.** openfootball provides scores only, not per-match detail (shots, possession, cards). Those are deliberately left empty for now — a completed match with no detail simply shows "detailed match stats not available yet" rather than model-generated numbers. Binding real per-match stats (e.g. from Wikipedia) is a separate concern; the Wikipedia stats sync stays gated behind `ENABLE_STATS_SYNC` (default `false`) and is not wired to these fixtures yet.
+
+> **Note on ratings.** `fifa_code`/`confederation` for each nation are accurate, but the `fifa_ranking`/`elo_rating` values that feed the prediction model are approximate illustrative figures on a descending scale — refine them against an official FIFA ranking / Elo source for more accurate predictions.
 
 ## UI Theme And Animation
 
@@ -424,11 +427,43 @@ Seeded watch links intentionally use a safe official FIFA tournament placeholder
 The MVP model is intentionally transparent:
 
 1. Calculate a team strength score from Elo rating and FIFA ranking.
-2. Apply optional home advantage only when `neutral_venue` is false.
-3. Convert strength difference into expected goals.
-4. Use a compact Poisson score matrix to estimate home win, draw, and away win probabilities.
-5. Pick a rounded predicted scoreline and confidence label.
-6. For knockout stages, split draw probability into advance probabilities.
+2. Add a bounded **tournament-form adjustment** on top of that blend (below), so a team's actual performance-to-date nudges its strength.
+3. Apply optional home advantage only when `neutral_venue` is false.
+4. Convert strength difference into expected goals.
+5. Use a compact Poisson score matrix (Dixon-Coles corrected) to estimate home win, draw, and away win probabilities.
+6. Pick a rounded predicted scoreline and confidence label.
+7. For knockout stages, resolve the tie through a two-stage extra-time and penalty sub-model (below) to produce advance probabilities.
+
+Current model version: `elo-symmetric-etp-form-v5`.
+
+### Tournament-form adjustment
+
+The static Elo/FIFA blend has no memory of how a team has actually played once the tournament is under way. The form adjustment adds that memory — but crucially it measures **performance relative to the model's own pre-match expectation**, not raw recent results (a 4-0 win over a weak side and a 4-0 win over a strong side are very different pieces of information, and naive "last 5 results" form conflates them).
+
+For each of a team's completed tournament matches, the residual is `actual goal difference − predicted goal difference` from that team's perspective (positive = the team beat the model's own prediction). The mean residual over its most recent matches (`get_recent_tournament_form`, default last 5, strictly before the match being predicted — no lookahead) is scaled into an Elo-equivalent nudge (`FORM_ADJUSTMENT_SCALE`) and hard-capped (`FORM_ADJUSTMENT_CAP ≈ 50` points). That cap is deliberately small next to the ~150-300 point gaps that separate strong and weak teams here, so form *nudges* the baseline rather than dominating it.
+
+- The adjustment is a **clearly separate additive term** on top of the Elo/ranking blend (never blended into it), so it can be tuned or disabled independently.
+- A team with **no completed tournament matches yet** (e.g. its very first match) has no prior form by definition, so its adjustment is exactly `0.0` and its prediction is identical to the pre-form baseline.
+- Each prediction surfaces the raw signed values (`home_form_adjustment` / `away_form_adjustment`), and the plain-language explanation adds a line only when the adjustment is large enough to matter (e.g. "*Morocco have outperformed the model's own pre-match expectations by 1.5 goals per game so far this tournament*").
+
+### Knockout resolution: extra time and penalties
+
+Rather than folding the whole 90-minute draw probability onto each side by their win share, knockout ties are resolved as the real competition does — if level after 90, 30 minutes of extra time; if still level, a penalty shootout:
+
+- **Extra time** is modelled with its own Poisson goal matrix on a *reduced* total-goals baseline (`ET_TOTAL_GOALS`, ~a third of regulation) and a *dampened* strength gap (`ET_SUPREMACY_DAMPENING`), reflecting that extra time is shorter, more cautious, and fatigued — not a straight time-proportional scale-down.
+- **Penalties** are treated as near-random: a small, hard-capped nudge off 50/50 for the stronger side (`PENALTY_MAX_EDGE ≈ 0.07`), so even the largest strength mismatch never predicts much beyond ~58/42, matching the well-documented weak link between team strength and shootout outcomes.
+- The **third-place play-off** skips extra time entirely (FIFA rules): a draw after 90 goes straight to penalties.
+
+Each knockout prediction therefore decomposes a team's advance probability into three additive, disjoint paths, surfaced as response-only fields on `GET /api/predictions/<fixture_id>` and `GET /api/bracket` (derived at read time, not stored):
+
+```text
+home_win_in_90_probability          # wins in regulation
+home_win_in_et_probability           # 90' draw, then wins in extra time
+home_win_on_penalties_probability    # 90' draw, ET draw, then wins the shootout
+home_advance_probability             # = sum of the three above (mirrored for away_*)
+```
+
+Plus `et_predicted_home_goals`/`et_predicted_away_goals` (an illustrative ET scoreline) and the underlying `et_*`/`penalty_*` conditional probabilities. The Match Centre surfaces the favoured team's split as a compact "62% in 90 · 8% in ET · 30% on penalties" line beneath the model-vs-market slider.
 
 This is a baseline, not a certainty engine. It is designed to be replaced later by a trained model once historical match ingestion and evaluation are available.
 

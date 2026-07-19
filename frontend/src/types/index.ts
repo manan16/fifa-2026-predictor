@@ -185,6 +185,13 @@ export interface Prediction {
   explanation_json?: string[];
   home_advance_probability?: number;
   away_advance_probability?: number;
+  // Knockout two-stage resolution breakdown (present only for knockout stages).
+  home_win_in_90_probability?: number;
+  away_win_in_90_probability?: number;
+  home_win_in_et_probability?: number;
+  away_win_in_et_probability?: number;
+  home_win_on_penalties_probability?: number;
+  away_win_on_penalties_probability?: number;
   predicted_stats?: PredictedMatchStats;
 }
 

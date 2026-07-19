@@ -29,6 +29,20 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
   const awayModelProbability = metric.useAdvance
     ? prediction.away_advance_probability ?? prediction.away_win_probability
     : prediction.away_win_probability;
+
+  // Knockout resolution breakdown (in-90 / in-ET / on-penalties) for the team
+  // the model favours to advance. Present only for knockout stages.
+  const hasResolutionBreakdown =
+    prediction.home_win_in_90_probability != null && prediction.away_win_in_90_probability != null;
+  const advanceFavoursHome = (prediction.home_advance_probability ?? 0) >= (prediction.away_advance_probability ?? 0);
+  const favouredAdvanceCode = advanceFavoursHome
+    ? fixture.home_team_code ?? fixture.home_team_name
+    : fixture.away_team_code ?? fixture.away_team_name;
+  const resolutionBreakdown = advanceFavoursHome
+    ? [prediction.home_win_in_90_probability, prediction.home_win_in_et_probability, prediction.home_win_on_penalties_probability]
+    : [prediction.away_win_in_90_probability, prediction.away_win_in_et_probability, prediction.away_win_on_penalties_probability];
+  const asPct = (value?: number) => Math.round((value ?? 0) * 100);
+
   const modelFavourite = prediction.home_win_probability >= prediction.away_win_probability ? fixture.home_team_name : fixture.away_team_name;
   const marketFavourite = (consensus?.home_probability ?? 0) >= (consensus?.away_probability ?? 0) ? fixture.home_team_name : fixture.away_team_name;
   const hasActualScore = fixture.actual_home_score != null && fixture.actual_away_score != null;
@@ -75,6 +89,16 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
             marketHomeProbability={consensus?.home_probability}
             metricLabel={metric.label}
           />
+          {hasResolutionBreakdown && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+              <span className="text-slate-500">{favouredAdvanceCode} to advance</span>
+              <span className="text-yellow-300">{asPct(resolutionBreakdown[0])}% in 90</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-yellow-300">{asPct(resolutionBreakdown[1])}% in ET</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-yellow-300">{asPct(resolutionBreakdown[2])}% on penalties</span>
+            </div>
+          )}
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-black uppercase tracking-wide">
             <span className="border border-yellow-300/40 bg-yellow-400/10 px-3 py-2 text-yellow-300">Model pick {modelFavourite}</span>
             <span className="border border-sky-300/40 bg-sky-400/10 px-3 py-2 text-sky-300">Market favours {marketFavourite}</span>

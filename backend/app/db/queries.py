@@ -386,7 +386,11 @@ def get_prediction_by_fixture_id(fixture_id: int) -> dict[str, Any] | None:
                 p.created_at,
                 f.stage,
                 ht.name AS home_team_name,
-                at.name AS away_team_name
+                at.name AS away_team_name,
+                ht.fifa_ranking AS home_team_ranking,
+                ht.elo_rating AS home_team_elo,
+                at.fifa_ranking AS away_team_ranking,
+                at.elo_rating AS away_team_elo
             FROM predictions p
             JOIN fixtures f ON p.fixture_id = f.id
             JOIN teams ht ON f.home_team_id = ht.id
@@ -465,6 +469,10 @@ def get_bracket_fixtures_with_odds_results() -> list[dict[str, Any]]:
                 at.name AS away_team_name,
                 ht.fifa_code AS home_team_code,
                 at.fifa_code AS away_team_code,
+                ht.fifa_ranking AS home_team_ranking,
+                ht.elo_rating AS home_team_elo,
+                at.fifa_ranking AS away_team_ranking,
+                at.elo_rating AS away_team_elo,
                 to_char(f.kickoff_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS kickoff_time,
                 lp.home_win_probability,
                 lp.draw_probability,
@@ -913,6 +921,58 @@ def get_latest_sync_runs(limit: int = 10) -> list[dict[str, Any]]:
             LIMIT %s;
             """,
             (limit,),
+        )
+        return list(cur.fetchall())
+
+
+def get_recent_tournament_form(
+    team_id: int,
+    before_kickoff_time: Any,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Most recent completed fixtures a team played before a given kickoff time.
+
+    Returns up to ``limit`` rows (most-recent first), each carrying the team's
+    ``side`` ("home"/"away") in that fixture, the fixture's actual score, and the
+    stored prediction's ``predicted_home_goals``/``predicted_away_goals`` (latest
+    prediction per fixture, via the same DISTINCT ON pattern used elsewhere).
+
+    Only completed fixtures (non-null actual score) strictly *before*
+    ``before_kickoff_time`` are included, so a team's form is always computed from
+    matches that finished before the one being predicted — no lookahead. Both
+    group-stage and knockout fixtures count toward form.
+    """
+    with get_dict_cursor() as cur:
+        cur.execute(
+            """
+            WITH latest_predictions AS (
+                SELECT DISTINCT ON (fixture_id)
+                    fixture_id,
+                    predicted_home_goals,
+                    predicted_away_goals
+                FROM predictions
+                ORDER BY fixture_id, created_at DESC, id DESC
+            )
+            SELECT
+                CASE WHEN f.home_team_id = %(team_id)s THEN 'home' ELSE 'away' END AS side,
+                COALESCE(f.actual_home_score, f.home_score) AS actual_home_score,
+                COALESCE(f.actual_away_score, f.away_score) AS actual_away_score,
+                lp.predicted_home_goals,
+                lp.predicted_away_goals,
+                to_char(f.kickoff_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS kickoff_time
+            FROM fixtures f
+            LEFT JOIN latest_predictions lp ON lp.fixture_id = f.id
+            WHERE (f.home_team_id = %(team_id)s OR f.away_team_id = %(team_id)s)
+              AND f.kickoff_time < %(before_kickoff_time)s
+              AND COALESCE(f.actual_home_score, f.home_score) IS NOT NULL
+            ORDER BY f.kickoff_time DESC, f.match_number DESC
+            LIMIT %(limit)s;
+            """,
+            {
+                "team_id": team_id,
+                "before_kickoff_time": before_kickoff_time,
+                "limit": limit,
+            },
         )
         return list(cur.fetchall())
 

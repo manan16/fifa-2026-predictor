@@ -1,11 +1,19 @@
 from app.db.connection import get_connection
+from app.db.queries import get_recent_tournament_form
 from app.ml.model import predict_match
 from psycopg.types.json import Jsonb
 
-# Seed data mirrors the demo knockout bracket screenshot.
-# FIFA rankings are from the official FIFA/Coca-Cola Men's World Ranking
-# published on 11 June 2026.
-# Kickoff times are stored as London-local timestamps for display in the MVP.
+# Seed data reflects the REAL 2026 FIFA World Cup knockout stage (Round of 32
+# through the Final). Fixtures, pairings and scores were sourced from the
+# openfootball/worldcup.json feed and cross-verified against Wikipedia's
+# "2026 FIFA World Cup knockout stage" article and match reports (FIFA.com,
+# NBC, Al Jazeera, ESPN) in July 2026. Kickoff times are stored as UTC.
+#
+# The 32 teams below are the real Round-of-32 participants. fifa_code and
+# confederation are accurate; fifa_ranking and elo_rating are APPROXIMATE
+# illustrative values on a descending scale (they feed the prediction model
+# but were not the focus of this data refresh — refine against an official
+# FIFA ranking / Elo source for more accurate predictions).
 TEAMS = [
     ("Argentina", "ARG", "CONMEBOL", 1, 2145),
     ("France", "FRA", "UEFA", 3, 2110),
@@ -41,103 +49,120 @@ TEAMS = [
     ("Ghana", "GHA", "CAF", 73, 1565),
 ]
 
+# venue/city are used across the app as the single-source-of-truth markers that
+# scope every fixtures/bracket query (see DEMO_FIXTURE_VENUE/CITY in queries.py),
+# so they stay as these stable marker strings rather than per-match stadium names.
 KNOCKOUT_VENUE = "Knockout bracket"
 KNOCKOUT_CITY = "World Cup 2026"
 
-# Round of 32 entrants are fixed — these are the teams that qualified for the
-# knockout stage. Every later round is *derived* from these results, never
-# hardcoded, so a team that loses can never reappear in a later round.
-# Tuple shape: (match_number, group_name, home_team, away_team, kickoff_time)
+# Real Round of 32 pairings (the 16 opening knockout ties). Slots 1-8 are the
+# left half of the bracket (they feed Semi-final 29), slots 9-16 the right half
+# (they feed Semi-final 30). Every later round is *derived* from these results
+# by chaining winners forward, so a team that loses can never reappear.
+# Home/away orientation follows the official match listing.
+# Tuple shape: (match_number, group_name, home_team, away_team, kickoff_time_utc)
 ROUND_OF_32 = [
-    (1, "Left bracket", "South Africa", "Canada", "2026-06-28 20:00:00"),
-    (2, "Right bracket", "Brazil", "Japan", "2026-06-29 18:00:00"),
-    (3, "Left bracket", "Germany", "Paraguay", "2026-06-29 21:30:00"),
-    (4, "Left bracket", "Netherlands", "Morocco", "2026-06-30 02:00:00"),
-    (5, "Right bracket", "Ivory Coast", "Norway", "2026-06-30 18:00:00"),
-    (6, "Left bracket", "France", "Sweden", "2026-06-30 22:00:00"),
-    (7, "Right bracket", "Mexico", "Ecuador", "2026-07-01 02:00:00"),
-    (8, "Right bracket", "England", "Congo DR", "2026-07-01 17:00:00"),
-    (9, "Left bracket", "Belgium", "Senegal", "2026-07-01 21:00:00"),
-    (10, "Left bracket", "USA", "Bosnia-Herz", "2026-07-02 01:00:00"),
-    (11, "Left bracket", "Spain", "Austria", "2026-07-02 20:00:00"),
-    (12, "Left bracket", "Portugal", "Croatia", "2026-07-03 00:00:00"),
-    (13, "Right bracket", "Switzerland", "Algeria", "2026-07-03 04:00:00"),
-    (14, "Right bracket", "Australia", "Egypt", "2026-07-03 19:00:00"),
-    (15, "Right bracket", "Argentina", "Cape Verde", "2026-07-03 23:00:00"),
-    (16, "Right bracket", "Colombia", "Ghana", "2026-07-04 02:30:00"),
+    # Left half
+    (1, "Left bracket", "Germany", "Paraguay", "2026-06-29 20:30:00"),
+    (2, "Left bracket", "France", "Sweden", "2026-06-30 21:00:00"),
+    (3, "Left bracket", "South Africa", "Canada", "2026-06-28 19:00:00"),
+    (4, "Left bracket", "Netherlands", "Morocco", "2026-06-30 01:00:00"),
+    (5, "Left bracket", "Portugal", "Croatia", "2026-07-02 23:00:00"),
+    (6, "Left bracket", "Spain", "Austria", "2026-07-02 19:00:00"),
+    (7, "Left bracket", "USA", "Bosnia-Herz", "2026-07-02 00:00:00"),
+    (8, "Left bracket", "Belgium", "Senegal", "2026-07-01 20:00:00"),
+    # Right half
+    (9, "Right bracket", "Brazil", "Japan", "2026-06-29 17:00:00"),
+    (10, "Right bracket", "Ivory Coast", "Norway", "2026-06-30 17:00:00"),
+    (11, "Right bracket", "Mexico", "Ecuador", "2026-07-01 01:00:00"),
+    (12, "Right bracket", "England", "Congo DR", "2026-07-01 16:00:00"),
+    (13, "Right bracket", "Argentina", "Cape Verde", "2026-07-03 22:00:00"),
+    (14, "Right bracket", "Australia", "Egypt", "2026-07-03 18:00:00"),
+    (15, "Right bracket", "Switzerland", "Algeria", "2026-07-03 03:00:00"),
+    (16, "Right bracket", "Colombia", "Ghana", "2026-07-04 01:30:00"),
 ]
 
-# Later-round slots. Home/away teams are NOT hardcoded — each is the advancing
-# team from a prior-round match. ``home_source``/``away_source`` are the
-# match_numbers whose winners feed this slot, preserving the bracket tree.
-# Tuple shape: (match_number, stage, group_name, home_source, away_source, kickoff_time)
+# Later-round slots, matching the REAL bracket tree. Home/away teams are NOT
+# hardcoded — each is the advancing team from a prior-round match.
+# ``home_source``/``away_source`` are the match_numbers whose winners feed this
+# slot. Ordering + Left/Right groups reproduce the real path to the Final.
+# Tuple shape: (match_number, stage, group_name, home_source, away_source, kickoff_time_utc)
 BRACKET_PROGRESSION = [
-    # Round of 16
-    (17, "Round of 16", "Left bracket", 1, 4, "2026-07-04 18:00:00"),
-    (18, "Round of 16", "Left bracket", 3, 6, "2026-07-04 22:00:00"),
-    (19, "Round of 16", "Right bracket", 2, 5, "2026-07-05 21:00:00"),
-    (20, "Round of 16", "Right bracket", 7, 8, "2026-07-06 01:00:00"),
-    (21, "Round of 16", "Left bracket", 12, 11, "2026-07-06 20:00:00"),
-    (22, "Round of 16", "Left bracket", 10, 9, "2026-07-07 01:00:00"),
-    (23, "Round of 16", "Right bracket", 15, 14, "2026-07-07 17:00:00"),
-    (24, "Round of 16", "Right bracket", 13, 16, "2026-07-07 21:00:00"),
+    # Round of 16 (left half feeds SF 29, right half feeds SF 30)
+    (17, "Round of 16", "Left bracket", 1, 2, "2026-07-04 21:00:00"),
+    (18, "Round of 16", "Left bracket", 3, 4, "2026-07-04 17:00:00"),
+    (19, "Round of 16", "Left bracket", 5, 6, "2026-07-06 19:00:00"),
+    (20, "Round of 16", "Left bracket", 7, 8, "2026-07-07 00:00:00"),
+    (21, "Round of 16", "Right bracket", 9, 10, "2026-07-05 20:00:00"),
+    (22, "Round of 16", "Right bracket", 11, 12, "2026-07-06 00:00:00"),
+    (23, "Round of 16", "Right bracket", 13, 14, "2026-07-07 16:00:00"),
+    (24, "Round of 16", "Right bracket", 15, 16, "2026-07-07 20:00:00"),
     # Quarter-finals
-    (25, "Quarter-final", "Left bracket", 18, 17, "2026-07-09 21:00:00"),
-    (26, "Quarter-final", "Left bracket", 21, 22, "2026-07-10 20:00:00"),
-    (27, "Quarter-final", "Right bracket", 19, 20, "2026-07-11 22:00:00"),
-    (28, "Quarter-final", "Right bracket", 23, 24, "2026-07-12 02:00:00"),
+    (25, "Quarter-final", "Left bracket", 17, 18, "2026-07-09 20:00:00"),
+    (26, "Quarter-final", "Left bracket", 19, 20, "2026-07-10 19:00:00"),
+    (27, "Quarter-final", "Right bracket", 21, 22, "2026-07-11 21:00:00"),
+    (28, "Quarter-final", "Right bracket", 23, 24, "2026-07-12 01:00:00"),
     # Semi-finals
-    (29, "Semi-final", "Left bracket", 25, 26, "2026-07-14 20:00:00"),
-    (30, "Semi-final", "Right bracket", 27, 28, "2026-07-15 20:00:00"),
+    (29, "Semi-final", "Left bracket", 25, 26, "2026-07-14 19:00:00"),
+    (30, "Semi-final", "Right bracket", 27, 28, "2026-07-15 19:00:00"),
     # Final
-    (31, "Final", "Champion pick", 29, 30, "2026-07-19 20:00:00"),
+    (31, "Final", "Champion pick", 29, 30, "2026-07-19 19:00:00"),
 ]
+
+# The third-place play-off is contested by the two semi-final LOSERS (not
+# winners), so it sits outside BRACKET_PROGRESSION's winner-chaining and is
+# handled separately. Its stage is intentionally not in queries.KNOCKOUT_STAGES,
+# so it appears on the Fixtures list but not inside the bracket tree.
+# Tuple shape: (match_number, group_name, home_semi_source, away_semi_source, kickoff_time_utc)
+THIRD_PLACE = (32, "Third place", 29, 30, "2026-07-18 21:00:00")
 
 _TEAM_FEATURES = {name: {"name": name, "fifa_ranking": ranking, "elo_rating": elo} for name, _code, _conf, ranking, elo in TEAMS}
 
-DEMO_ACTUAL_RESULTS = {
-    1: {
-        "actual_home_score": 0,
-        "actual_away_score": 1,
-        "winner_team_name": "Canada",
-        "home_penalties": None,
-        "away_penalties": None,
-        "stats": {
-            "home_shots": 10,
-            "away_shots": 13,
-            "home_shots_on_target": 3,
-            "away_shots_on_target": 6,
-            "home_possession": 47,
-            "away_possession": 53,
-            "home_corners": 4,
-            "away_corners": 6,
-            "home_yellow_cards": 2,
-            "away_yellow_cards": 1,
-            "home_red_cards": 0,
-            "away_red_cards": 0,
-        },
-    },
-    2: {
-        "actual_home_score": 2,
-        "actual_away_score": 1,
-        "winner_team_name": "Brazil",
-        "home_penalties": None,
-        "away_penalties": None,
-        "stats": {
-            "home_shots": 17,
-            "away_shots": 9,
-            "home_shots_on_target": 8,
-            "away_shots_on_target": 3,
-            "home_possession": 59,
-            "away_possession": 41,
-            "home_corners": 7,
-            "away_corners": 3,
-            "home_yellow_cards": 1,
-            "away_yellow_cards": 2,
-            "home_red_cards": 0,
-            "away_red_cards": 0,
-        },
-    },
+# Real completed results, keyed by match_number. actual_home_score/away_score
+# hold the decisive final score: for penalty shoot-outs that is the level
+# 90'/extra-time score with home_penalties/away_penalties recorded; for matches
+# won in extra time it is the after-extra-time scoreline. Only the Final (31)
+# is absent — it had not kicked off at seeding time, so it stays scheduled with
+# no score. openfootball scores don't include per-match detail stats (shots,
+# possession, cards), so no fabricated actual stats are attached here.
+ACTUAL_RESULTS = {
+    # Round of 32
+    1: {"actual_home_score": 1, "actual_away_score": 1, "winner_team_name": "Paraguay", "home_penalties": 3, "away_penalties": 4},
+    2: {"actual_home_score": 3, "actual_away_score": 0, "winner_team_name": "France", "home_penalties": None, "away_penalties": None},
+    3: {"actual_home_score": 0, "actual_away_score": 1, "winner_team_name": "Canada", "home_penalties": None, "away_penalties": None},
+    4: {"actual_home_score": 1, "actual_away_score": 1, "winner_team_name": "Morocco", "home_penalties": 2, "away_penalties": 3},
+    5: {"actual_home_score": 2, "actual_away_score": 1, "winner_team_name": "Portugal", "home_penalties": None, "away_penalties": None},
+    6: {"actual_home_score": 3, "actual_away_score": 0, "winner_team_name": "Spain", "home_penalties": None, "away_penalties": None},
+    7: {"actual_home_score": 2, "actual_away_score": 0, "winner_team_name": "USA", "home_penalties": None, "away_penalties": None},
+    8: {"actual_home_score": 3, "actual_away_score": 2, "winner_team_name": "Belgium", "home_penalties": None, "away_penalties": None},  # a.e.t.
+    9: {"actual_home_score": 2, "actual_away_score": 1, "winner_team_name": "Brazil", "home_penalties": None, "away_penalties": None},
+    10: {"actual_home_score": 1, "actual_away_score": 2, "winner_team_name": "Norway", "home_penalties": None, "away_penalties": None},
+    11: {"actual_home_score": 2, "actual_away_score": 0, "winner_team_name": "Mexico", "home_penalties": None, "away_penalties": None},
+    12: {"actual_home_score": 2, "actual_away_score": 1, "winner_team_name": "England", "home_penalties": None, "away_penalties": None},
+    13: {"actual_home_score": 3, "actual_away_score": 2, "winner_team_name": "Argentina", "home_penalties": None, "away_penalties": None},  # a.e.t.
+    14: {"actual_home_score": 1, "actual_away_score": 1, "winner_team_name": "Egypt", "home_penalties": 2, "away_penalties": 4},
+    15: {"actual_home_score": 2, "actual_away_score": 0, "winner_team_name": "Switzerland", "home_penalties": None, "away_penalties": None},
+    16: {"actual_home_score": 1, "actual_away_score": 0, "winner_team_name": "Colombia", "home_penalties": None, "away_penalties": None},
+    # Round of 16
+    17: {"actual_home_score": 0, "actual_away_score": 1, "winner_team_name": "France", "home_penalties": None, "away_penalties": None},
+    18: {"actual_home_score": 0, "actual_away_score": 3, "winner_team_name": "Morocco", "home_penalties": None, "away_penalties": None},
+    19: {"actual_home_score": 0, "actual_away_score": 1, "winner_team_name": "Spain", "home_penalties": None, "away_penalties": None},
+    20: {"actual_home_score": 1, "actual_away_score": 4, "winner_team_name": "Belgium", "home_penalties": None, "away_penalties": None},
+    21: {"actual_home_score": 1, "actual_away_score": 2, "winner_team_name": "Norway", "home_penalties": None, "away_penalties": None},
+    22: {"actual_home_score": 2, "actual_away_score": 3, "winner_team_name": "England", "home_penalties": None, "away_penalties": None},
+    23: {"actual_home_score": 3, "actual_away_score": 2, "winner_team_name": "Argentina", "home_penalties": None, "away_penalties": None},
+    24: {"actual_home_score": 0, "actual_away_score": 0, "winner_team_name": "Switzerland", "home_penalties": 4, "away_penalties": 3},
+    # Quarter-finals
+    25: {"actual_home_score": 2, "actual_away_score": 0, "winner_team_name": "France", "home_penalties": None, "away_penalties": None},
+    26: {"actual_home_score": 2, "actual_away_score": 1, "winner_team_name": "Spain", "home_penalties": None, "away_penalties": None},
+    27: {"actual_home_score": 1, "actual_away_score": 2, "winner_team_name": "England", "home_penalties": None, "away_penalties": None},  # a.e.t.
+    28: {"actual_home_score": 3, "actual_away_score": 1, "winner_team_name": "Argentina", "home_penalties": None, "away_penalties": None},  # a.e.t.
+    # Semi-finals
+    29: {"actual_home_score": 0, "actual_away_score": 2, "winner_team_name": "Spain", "home_penalties": None, "away_penalties": None},
+    30: {"actual_home_score": 1, "actual_away_score": 2, "winner_team_name": "Argentina", "home_penalties": None, "away_penalties": None},
+    # Final (31) not yet played at seeding time — intentionally absent.
+    # Third-place play-off
+    32: {"actual_home_score": 4, "actual_away_score": 6, "winner_team_name": "England", "home_penalties": None, "away_penalties": None},
 }
 
 
@@ -175,10 +200,14 @@ def _actual_winner(demo: dict, home_name: str, away_name: str) -> str:
 
 
 def _resolve_winner(match_number: int, stage: str, home_name: str, away_name: str) -> str:
-    """Winner of a slot: actual result takes precedence over the prediction."""
-    demo = DEMO_ACTUAL_RESULTS.get(match_number)
-    if demo is not None:
-        return _actual_winner(demo, home_name, away_name)
+    """Winner of a slot: the real result if the match was played, else the model.
+
+    Only the Final has no real result at seeding time; the model's predicted
+    advancer stands in for it (and is not a source for any downstream slot).
+    """
+    result = ACTUAL_RESULTS.get(match_number)
+    if result is not None:
+        return _actual_winner(result, home_name, away_name)
     prediction = predict_match(
         _TEAM_FEATURES[home_name], _TEAM_FEATURES[away_name], stage=stage, neutral_venue=True
     )
@@ -186,105 +215,52 @@ def _resolve_winner(match_number: int, stage: str, home_name: str, away_name: st
 
 
 def build_chained_fixtures() -> list[tuple]:
-    """Build the full knockout bracket by chaining winners forward.
+    """Build the full knockout bracket by chaining real results forward.
 
     Round of 32 entrants are fixed; every later round's home/away team is the
-    advancing team (actual result if the feeding match is completed, otherwise
-    predicted) of the prior-round match that feeds that slot. Deterministic, so
-    re-running the seed reproduces the identical bracket.
+    advancing team of the prior-round match that feeds that slot (the real
+    winner where a result exists, otherwise the model's pick). The third-place
+    play-off is fed by the two semi-final LOSERS. Deterministic, so re-running
+    the seed reproduces the identical bracket.
     """
     winners: dict[int, str] = {}
+    losers: dict[int, str] = {}
     fixtures: list[tuple] = []
 
-    for match_number, group, home_name, away_name, kickoff in ROUND_OF_32:
-        fixtures.append(
-            (match_number, "Round of 32", group, home_name, away_name, KNOCKOUT_VENUE, KNOCKOUT_CITY, kickoff)
-        )
-        winners[match_number] = _resolve_winner(match_number, "Round of 32", home_name, away_name)
-
-    for match_number, stage, group, home_source, away_source, kickoff in BRACKET_PROGRESSION:
-        home_name = winners[home_source]
-        away_name = winners[away_source]
+    def record(match_number: int, stage: str, group: str, home_name: str, away_name: str, kickoff: str) -> None:
         fixtures.append(
             (match_number, stage, group, home_name, away_name, KNOCKOUT_VENUE, KNOCKOUT_CITY, kickoff)
         )
-        winners[match_number] = _resolve_winner(match_number, stage, home_name, away_name)
+        winner = _resolve_winner(match_number, stage, home_name, away_name)
+        winners[match_number] = winner
+        losers[match_number] = away_name if winner == home_name else home_name
+
+    for match_number, group, home_name, away_name, kickoff in ROUND_OF_32:
+        record(match_number, "Round of 32", group, home_name, away_name, kickoff)
+
+    for match_number, stage, group, home_source, away_source, kickoff in BRACKET_PROGRESSION:
+        record(match_number, stage, group, winners[home_source], winners[away_source], kickoff)
+
+    # Third-place play-off: contested by the two semi-final losers.
+    tp_number, tp_group, home_semi, away_semi, tp_kickoff = THIRD_PLACE
+    record(tp_number, "Third-place play-off", tp_group, losers[home_semi], losers[away_semi], tp_kickoff)
 
     return fixtures
 
 
-# Chained bracket used for seeding and consumed by tests. Same tuple shape as the
-# legacy hardcoded list: (match_number, stage, group, home, away, venue, city, kickoff).
+# Chained bracket used for seeding and consumed by tests. Tuple shape:
+# (match_number, stage, group, home, away, venue, city, kickoff).
 FIXTURES = build_chained_fixtures()
-
-# Honest-demo (Option A): the Round of 32 is played through so the "Completed"
-# view has content; later rounds stay as scheduled predictions. Results and
-# stats for completed ties are synthetic and generated from the same model as
-# the predictions — we never bind Wikipedia (or any live source) onto these
-# fixtures, because they don't correspond to real matches.
-DEMO_COMPLETED_STAGES = ("Round of 32",)
-
-
-def _synthetic_actual_result(stage: str, home_name: str, away_name: str) -> dict:
-    """A plausible completed result derived from the same model as the prediction.
-
-    The scoreline is the model's predicted scoreline and the advancing side is
-    the model's predicted winner, so a synthetic result never contradicts the
-    forward bracket. A level knockout scoreline is resolved with a synthetic
-    penalty shoot-out for the winner. Stats mirror the predicted match stats, so
-    the actual-vs-predicted comparison stays internally consistent.
-    """
-    prediction = predict_match(
-        _TEAM_FEATURES[home_name], _TEAM_FEATURES[away_name], stage=stage, neutral_venue=True
-    )
-    home_score = prediction["predicted_home_goals"]
-    away_score = prediction["predicted_away_goals"]
-    winner_name = _predicted_winner(prediction, home_name, away_name)
-
-    home_penalties = away_penalties = None
-    if home_score == away_score:
-        home_penalties, away_penalties = (4, 3) if winner_name == home_name else (3, 4)
-    elif (home_score > away_score) != (winner_name == home_name):
-        # Keep the scoreline and the advancing side in agreement.
-        winner_name = home_name if home_score > away_score else away_name
-
-    stats = prediction["predicted_stats"]
-    home_possession = round(stats["home_possession"])
-    return {
-        "actual_home_score": home_score,
-        "actual_away_score": away_score,
-        "winner_team_name": winner_name,
-        "home_penalties": home_penalties,
-        "away_penalties": away_penalties,
-        "stats": {
-            "home_shots": stats["home_shots"],
-            "away_shots": stats["away_shots"],
-            "home_shots_on_target": stats["home_shots_on_target"],
-            "away_shots_on_target": stats["away_shots_on_target"],
-            "home_possession": home_possession,
-            "away_possession": 100 - home_possession,
-            "home_corners": stats["home_corners"],
-            "away_corners": stats["away_corners"],
-            "home_yellow_cards": stats["home_yellow_cards"],
-            "away_yellow_cards": stats["away_yellow_cards"],
-            "home_red_cards": 0,
-            "away_red_cards": 0,
-        },
-    }
 
 
 def _completed_result_for(match_number: int, stage: str, home_name: str, away_name: str) -> dict | None:
-    """Completed-match payload for a slot, or None if the tie is still scheduled.
+    """Real completed-match payload for a slot, or None if it is still scheduled.
 
-    Curated demo results (DEMO_ACTUAL_RESULTS) take precedence; otherwise every
-    Round-of-32 tie is filled with a synthetic, model-derived result.
+    Every knockout match that has been played has a real entry in
+    ACTUAL_RESULTS; matches not yet played (only the Final) return None so they
+    stay scheduled with no score.
     """
-    curated = DEMO_ACTUAL_RESULTS.get(match_number)
-    if curated is not None:
-        return curated
-    if stage in DEMO_COMPLETED_STAGES:
-        return _synthetic_actual_result(stage, home_name, away_name)
-    return None
+    return ACTUAL_RESULTS.get(match_number)
 
 
 def seed_database() -> None:
@@ -415,7 +391,9 @@ def seed_database() -> None:
 
             cur.execute(
                 """
-                SELECT f.id AS fixture_id, f.match_number, f.stage, ht.*, at.name AS away_name,
+                SELECT f.id AS fixture_id, f.match_number, f.stage,
+                       f.home_team_id, f.away_team_id, f.kickoff_time,
+                       ht.*, at.name AS away_name,
                        at.fifa_code AS away_fifa_code, at.confederation AS away_confederation,
                        at.fifa_ranking AS away_fifa_ranking, at.elo_rating AS away_elo_rating
                 FROM fixtures f
@@ -428,6 +406,16 @@ def seed_database() -> None:
             )
             rows = cur.fetchall()
 
+            # Commit the fixture reset / prediction wipe before generating any
+            # predictions, so each fixture's tournament-form lookup (which reads
+            # via a separate cursor/connection) sees a consistent, up-to-date view
+            # of prior fixtures and predictions rather than stale pre-reseed data.
+            conn.commit()
+
+            # Fixtures are processed in match_number order, which follows the real
+            # bracket chronology (Round of 32 before Round of 16, etc.), so by the
+            # time a fixture is predicted every earlier-kickoff match it could draw
+            # form from has already had its prediction and actual score committed.
             for row in rows:
                 home_team = {
                     "name": row["name"],
@@ -439,7 +427,19 @@ def seed_database() -> None:
                     "fifa_ranking": row["away_fifa_ranking"],
                     "elo_rating": row["away_elo_rating"],
                 }
-                prediction = predict_match(home_team, away_team, stage=row["stage"], neutral_venue=True)
+                # Form is drawn only from matches that kicked off before this one
+                # (no lookahead). A team's very first tournament match returns no
+                # rows here, so its form adjustment is exactly 0.0.
+                home_form = get_recent_tournament_form(row["home_team_id"], row["kickoff_time"])
+                away_form = get_recent_tournament_form(row["away_team_id"], row["kickoff_time"])
+                prediction = predict_match(
+                    home_team,
+                    away_team,
+                    stage=row["stage"],
+                    neutral_venue=True,
+                    home_form=home_form,
+                    away_form=away_form,
+                )
                 cur.execute(
                     """
                     INSERT INTO predictions (
@@ -524,10 +524,10 @@ def seed_database() -> None:
                     (row["fixture_id"],),
                 )
 
-                demo_actual = _completed_result_for(
+                result = _completed_result_for(
                     row["match_number"], row["stage"], row["name"], row["away_name"]
                 )
-                if demo_actual:
+                if result:
                     cur.execute(
                         """
                         UPDATE fixtures
@@ -539,23 +539,28 @@ def seed_database() -> None:
                             away_penalties = %s,
                             status = 'completed',
                             winner_team_id = (SELECT id FROM teams WHERE name = %s),
-                            result_source = 'demo_synthetic',
+                            result_source = 'openfootball',
                             last_result_sync = CURRENT_TIMESTAMP,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
                         """,
                         (
-                            demo_actual["actual_home_score"],
-                            demo_actual["actual_away_score"],
-                            demo_actual["actual_home_score"],
-                            demo_actual["actual_away_score"],
-                            demo_actual["home_penalties"],
-                            demo_actual["away_penalties"],
-                            demo_actual["winner_team_name"],
+                            result["actual_home_score"],
+                            result["actual_away_score"],
+                            result["actual_home_score"],
+                            result["actual_away_score"],
+                            result["home_penalties"],
+                            result["away_penalties"],
+                            result["winner_team_name"],
                             row["fixture_id"],
                         ),
                     )
-                    actual_stats = demo_actual["stats"]
+                # Real results carry the score only; detailed match stats (shots,
+                # possession, cards) are not available from this source and are
+                # left to the Wikipedia stats-binding path, so nothing fabricated
+                # is written here. Kept guarded in case a source later supplies them.
+                if result and result.get("stats"):
+                    actual_stats = result["stats"]
                     cur.execute(
                         """
                         INSERT INTO actual_match_stats (
@@ -575,7 +580,7 @@ def seed_database() -> None:
                             source,
                             last_sync
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'demo_synthetic', CURRENT_TIMESTAMP);
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'openfootball', CURRENT_TIMESTAMP);
                         """,
                         (
                             row["fixture_id"],
@@ -593,6 +598,10 @@ def seed_database() -> None:
                             actual_stats["away_red_cards"],
                         ),
                     )
+
+                # Commit this fixture's prediction and actual result before moving
+                # on, so the next fixture's tournament-form lookup can see it.
+                conn.commit()
 
         conn.commit()
         print(f"Seed data loaded: {len(TEAMS)} teams, {len(FIXTURES)} knockout fixtures")

@@ -3,6 +3,7 @@ from typing import Any
 from flask import Blueprint, jsonify
 
 from app.db import queries
+from app.ml import model
 
 bracket_bp = Blueprint("bracket", __name__)
 
@@ -50,6 +51,11 @@ def get_bracket():
             "home_advance_probability": _round_probability(fixture.get("home_advance_probability")),
             "away_advance_probability": _round_probability(fixture.get("away_advance_probability")),
         }
+        # Surface the extra-time/penalty breakdown (and a model-consistent advance
+        # probability) by recomputing from the row's 90' probabilities and team
+        # strengths. No-ops for rows without team strengths, keeping the SQL-derived
+        # advance in that case.
+        normalized.update(model.advance_breakdown_for_row(normalized))
         normalized["predicted_winner"] = _predicted_winner(normalized)
         grouped[stage_key].append(normalized)
 

@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.db import queries
+from app.ml import model
 from app.ml.model import predict_match
 
 predictions_bp = Blueprint("predictions", __name__)
@@ -15,6 +16,9 @@ def get_predictions():
 def get_prediction(fixture_id: int):
     prediction = queries.get_prediction_by_fixture_id(fixture_id)
     if prediction is not None:
+        # Advance + extra-time/penalty breakdown are derived, not stored, so
+        # recompute them from the stored 90' probabilities and team strengths.
+        prediction.update(model.advance_breakdown_for_row(prediction))
         return jsonify(prediction)
 
     fixture = queries.get_fixture_by_id(fixture_id)
@@ -25,14 +29,13 @@ def get_prediction(fixture_id: int):
     away_team = queries.get_team_by_id(fixture["away_team_id"])
     prediction = predict_match(home_team, away_team, stage=fixture["stage"], neutral_venue=True)
     saved = queries.insert_prediction({"fixture_id": fixture_id, **prediction})
-    # insert_prediction returns raw prediction columns; advance probabilities are
-    # derived (knockout only) and not stored, so carry them through from the
-    # freshly computed prediction to match the stored-prediction path.
+    # insert_prediction returns raw prediction columns; the knockout breakdown
+    # fields are derived and not stored, so carry them through from the freshly
+    # computed prediction to match the stored-prediction path.
     saved = {
         **saved,
         "stage": fixture["stage"],
-        "home_advance_probability": prediction.get("home_advance_probability"),
-        "away_advance_probability": prediction.get("away_advance_probability"),
+        **{field: prediction[field] for field in model.KNOCKOUT_BREAKDOWN_FIELDS if field in prediction},
     }
     return jsonify(saved), 201
 
