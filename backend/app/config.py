@@ -19,8 +19,11 @@ class Config:
     RESULTS_API_BASE_URL = os.getenv("RESULTS_API_BASE_URL", "")
     # Auto-sync is on by default now that the app runs the loop in-process.
     ENABLE_AUTO_SYNC = os.getenv("ENABLE_AUTO_SYNC", "true").lower() == "true"
-    # Wikipedia match-stats sync runs as a third step of the full sync.
-    ENABLE_STATS_SYNC = os.getenv("ENABLE_STATS_SYNC", "true").lower() == "true"
+    # Honest-demo (Option A): the Wikipedia match-stats sync is OFF by default.
+    # Demo fixtures are synthetic and don't map to real matches, so binding live
+    # Wikipedia data onto them produced pairings that disagreed with the bracket.
+    # Set ENABLE_STATS_SYNC=true only when ingesting real results (Option B).
+    ENABLE_STATS_SYNC = os.getenv("ENABLE_STATS_SYNC", "false").lower() == "true"
     SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "15"))
     JSON_SORT_KEYS = False
 

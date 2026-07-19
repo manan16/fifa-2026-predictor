@@ -1,4 +1,5 @@
 import { ActualMatchStats, FixtureMatchStatsResponse } from "../types";
+import { statusKind } from "../lib/match";
 
 interface Props {
   homeTeam: string;
@@ -6,6 +7,8 @@ interface Props {
   stats: FixtureMatchStatsResponse | null;
   actualStats?: ActualMatchStats | null;
   hasActualScore?: boolean;
+  /** Fixture status string; used to gate actual stats behind a played match. */
+  status?: string;
 }
 
 type Side = "home" | "away";
@@ -53,9 +56,15 @@ function PossessionBar({ home, away }: { home: number | null; away: number | nul
   );
 }
 
-export default function StatsPanel({ homeTeam, awayTeam, stats, actualStats = null, hasActualScore = false }: Props) {
+export default function StatsPanel({ homeTeam, awayTeam, stats, actualStats = null, hasActualScore = false, status = "" }: Props) {
   const home = stats?.home ?? null;
   const away = stats?.away ?? null;
+
+  // Actual stats only mean anything once the match has been played. A scheduled
+  // or live fixture must never render numeric rows — otherwise absent data (or a
+  // stray all-zero row) reads as a real 0-0 result. Completion is a finished
+  // status or a recorded final score.
+  const played = statusKind(status) === "done" || hasActualScore;
 
   const pick = (side: Side, key: keyof NonNullable<typeof home>): number | null => {
     const row = side === "home" ? home : away;
@@ -90,7 +99,9 @@ export default function StatsPanel({ homeTeam, awayTeam, stats, actualStats = nu
 
   const visibleRows = rows.filter((row) => row.home != null || row.away != null);
   const hasPossession = possession.home != null && possession.away != null;
-  const sourceNote = stats?.source_note ?? (actualStats?.source ? `Stats source: ${actualStats.source}.` : "Actual stats are official only when connected to a verified data provider.");
+  // Only surface numbers for a played match that actually has stats data.
+  const showStats = played && (hasPossession || visibleRows.length > 0);
+  const sourceNote = stats?.source_note ?? "Illustrative demo data — synthetic, model-generated. Not official results.";
 
   return (
     <section className="border border-white/15 bg-slate-900/85 p-5 shadow-broadcast">
@@ -99,7 +110,7 @@ export default function StatsPanel({ homeTeam, awayTeam, stats, actualStats = nu
         <span className="font-black text-gold">{homeTeam}</span>
         <span className="font-black text-sky-300">{awayTeam}</span>
       </div>
-      {hasPossession || visibleRows.length > 0 ? (
+      {showStats ? (
         <div className="mt-2 divide-y divide-white/5">
           <PossessionBar home={possession.home} away={possession.away} />
           {visibleRows.map((row) => (
@@ -108,7 +119,7 @@ export default function StatsPanel({ homeTeam, awayTeam, stats, actualStats = nu
         </div>
       ) : (
         <p className="mt-4 bg-white/[0.06] p-4 font-bold text-slate-300">
-          {hasActualScore ? "Final score available. Detailed match stats not available yet." : "Match not played yet. Actual stats will appear after full time."}
+          {played ? "Final score available — detailed match stats not available yet." : "Not available yet — match not played."}
         </p>
       )}
       <p className="mt-4 font-mono text-[11px] tracking-[0.06em] text-chalk-dim">

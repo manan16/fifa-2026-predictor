@@ -9,6 +9,7 @@ import StatsComparisonTable from "./StatsComparisonTable";
 import StatsPanel from "./StatsPanel";
 import TeamPanel from "./TeamPanel";
 import WhereToWatchCard from "./WhereToWatchCard";
+import { probabilityMetric } from "../lib/probability";
 
 interface Props {
   fixture: Fixture;
@@ -21,6 +22,13 @@ interface Props {
 }
 
 export default function MatchCentreDetail({ fixture, prediction, consensus, bookmakerOdds, stats, matchStats, watch }: Props) {
+  const metric = probabilityMetric(fixture.stage);
+  const homeModelProbability = metric.useAdvance
+    ? prediction.home_advance_probability ?? prediction.home_win_probability
+    : prediction.home_win_probability;
+  const awayModelProbability = metric.useAdvance
+    ? prediction.away_advance_probability ?? prediction.away_win_probability
+    : prediction.away_win_probability;
   const modelFavourite = prediction.home_win_probability >= prediction.away_win_probability ? fixture.home_team_name : fixture.away_team_name;
   const marketFavourite = (consensus?.home_probability ?? 0) >= (consensus?.away_probability ?? 0) ? fixture.home_team_name : fixture.away_team_name;
   const hasActualScore = fixture.actual_home_score != null && fixture.actual_away_score != null;
@@ -62,9 +70,10 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
           <ProbabilityTugOfWar
             homeLabel={fixture.home_team_code ?? fixture.home_team_name}
             awayLabel={fixture.away_team_code ?? fixture.away_team_name}
-            homeProbability={prediction.home_advance_probability ?? prediction.home_win_probability}
-            awayProbability={prediction.away_advance_probability ?? prediction.away_win_probability}
+            homeProbability={homeModelProbability}
+            awayProbability={awayModelProbability}
             marketHomeProbability={consensus?.home_probability}
+            metricLabel={metric.label}
           />
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-black uppercase tracking-wide">
             <span className="border border-yellow-300/40 bg-yellow-400/10 px-3 py-2 text-yellow-300">Model pick {modelFavourite}</span>
@@ -91,6 +100,7 @@ export default function MatchCentreDetail({ fixture, prediction, consensus, book
         stats={matchStats}
         actualStats={stats?.actual ?? stats?.actual_stats ?? null}
         hasActualScore={hasActualScore}
+        status={fixture.status}
       />
       <PredictedStatsPanel homeTeam={fixture.home_team_name} awayTeam={fixture.away_team_name} stats={stats?.predicted ?? stats?.predicted_stats ?? null} />
       <StatsComparisonTable predicted={stats?.predicted ?? stats?.predicted_stats ?? null} actual={stats?.actual ?? stats?.actual_stats ?? null} />

@@ -1,9 +1,9 @@
 from typing import Any
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, jsonify, request
 
 from app.db import queries
-from app.services import results_service, stats_prediction_service, stats_service
+from app.services import results_service, stats_prediction_service
 
 fixtures_bp = Blueprint("fixtures", __name__)
 
@@ -56,18 +56,13 @@ def _validate_actual_stats(payload: dict[str, Any]) -> str | None:
 
 @fixtures_bp.get("")
 def get_fixtures():
-    fixtures = queries.get_all_fixtures()
-    has_completed = any(
-        fixture.get("actual_home_score") is not None and fixture.get("actual_away_score") is not None
-        for fixture in fixtures
-    )
-    if not has_completed and not current_app.config.get("TESTING"):
-        try:
-            stats_service.sync_wikipedia_match_stats()
-            fixtures = queries.get_all_fixtures()
-        except Exception as exc:
-            print(f"Wikipedia fixture refresh failed: {exc}")
-    return jsonify(fixtures)
+    # Honest-demo mode (Option A): the Fixtures list and the Bracket both read
+    # the single canonical seeded knockout set. We deliberately do NOT reach out
+    # to Wikipedia to bind live match stats onto demo fixtures — those fixtures
+    # don't map to real matches, so any binding was arbitrary and produced
+    # pairings that disagreed with the Bracket. Completed scores/stats are
+    # synthetic and generated at seed time instead. See app/db/seed.py.
+    return jsonify(queries.get_all_fixtures())
 
 
 @fixtures_bp.get("/<int:fixture_id>")
@@ -121,8 +116,8 @@ def get_fixture_match_stats(fixture_id: int):
         {
             "home": stats["home"],
             "away": stats["away"],
-            "source": "Wikipedia",
-            "source_note": "Match stats via Wikipedia (CC BY-SA).",
+            "source": "Illustrative demo data",
+            "source_note": "Illustrative demo data — synthetic, model-generated. Not official results.",
         }
     )
 

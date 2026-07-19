@@ -1,6 +1,6 @@
 from collections import Counter
 
-from app.db.seed import FIXTURES, TEAMS
+from app.db.seed import BRACKET_PROGRESSION, DEMO_ACTUAL_RESULTS, FIXTURES, ROUND_OF_32, TEAMS
 from app.ml.model import calculate_confidence, predict_match
 
 REQUIRED_STATS_FIELDS = {
@@ -124,6 +124,77 @@ def test_predicted_match_stats_return_required_fields_and_constraints():
     assert stats["away_shots_on_target"] <= stats["away_shots"]
     for field in PROBABILITY_STATS_FIELDS:
         assert 0 <= stats[field] <= 1
+
+
+def _expected_winner(stage, home_name, away_name, match_number, teams):
+    """Independently recompute the advancing team, mirroring the seed's rule."""
+    demo = DEMO_ACTUAL_RESULTS.get(match_number)
+    if demo is not None:
+        home_score, away_score = demo["actual_home_score"], demo["actual_away_score"]
+        if home_score != away_score:
+            return home_name if home_score > away_score else away_name
+        return demo["winner_team_name"]
+    prediction = predict_match(teams[home_name], teams[away_name], stage=stage, neutral_venue=True)
+    home_advance = prediction.get("home_advance_probability")
+    away_advance = prediction.get("away_advance_probability")
+    if home_advance is not None and away_advance is not None and home_advance != away_advance:
+        return home_name if home_advance > away_advance else away_name
+    if prediction["home_win_probability"] != prediction["away_win_probability"]:
+        return home_name if prediction["home_win_probability"] > prediction["away_win_probability"] else away_name
+    return home_name
+
+
+def test_bracket_is_chained_and_consistent_round_to_round():
+    teams = {
+        name: {"name": name, "fifa_ranking": ranking, "elo_rating": elo}
+        for name, _code, _confederation, ranking, elo in TEAMS
+    }
+    fixtures_by_number = {fx[0]: fx for fx in FIXTURES}
+
+    # Winner of every slot, recomputed independently of the seed's bookkeeping.
+    winners = {}
+    for match_number, _group, home_name, away_name, _kickoff in ROUND_OF_32:
+        winners[match_number] = _expected_winner("Round of 32", home_name, away_name, match_number, teams)
+
+    round_32_entrants = {name for _n, _g, home, away, _k in ROUND_OF_32 for name in (home, away)}
+
+    for match_number, stage, _group, home_source, away_source, _kickoff in BRACKET_PROGRESSION:
+        _n, _stage, _grp, home_name, away_name, _venue, _city, _kick = fixtures_by_number[match_number]
+
+        # Each team in a later round must be the advancing team of its feeding match.
+        assert home_name == winners[home_source], (
+            f"match {match_number} home {home_name!r} != winner of match {home_source}"
+        )
+        assert away_name == winners[away_source], (
+            f"match {match_number} away {away_name!r} != winner of match {away_source}"
+        )
+        winners[match_number] = _expected_winner(stage, home_name, away_name, match_number, teams)
+
+    # No team appears in any round unless it originally entered in the Round of 32.
+    for _n, _stage, _grp, home_name, away_name, _venue, _city, _kick in FIXTURES:
+        assert home_name in round_32_entrants
+        assert away_name in round_32_entrants
+
+
+def test_round_of_16_teams_all_won_in_round_of_32():
+    round_32_numbers = {n for n, *_ in ROUND_OF_32}
+    round_of_16 = [fx for fx in FIXTURES if fx[1] == "Round of 16"]
+    assert len(round_of_16) == 8
+
+    # Losing side of every Round of 32 match, keyed by the eliminated team name.
+    teams = {
+        name: {"name": name, "fifa_ranking": ranking, "elo_rating": elo}
+        for name, _code, _confederation, ranking, elo in TEAMS
+    }
+    eliminated = set()
+    for match_number, _group, home_name, away_name, _kickoff in ROUND_OF_32:
+        winner = _expected_winner("Round of 32", home_name, away_name, match_number, teams)
+        eliminated.add(away_name if winner == home_name else home_name)
+
+    for _n, _stage, _grp, home_name, away_name, *_rest in round_of_16:
+        assert home_name not in eliminated
+        assert away_name not in eliminated
+    assert round_32_numbers  # sanity: fixtures were actually built
 
 
 def test_confidence_is_expected_label():

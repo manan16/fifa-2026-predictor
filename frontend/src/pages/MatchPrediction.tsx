@@ -29,7 +29,8 @@ export default function MatchPrediction() {
         setWatch(watchData);
       })
       .catch(() => setError("Unable to load this match centre."));
-    // Wikipedia match stats are optional; a failure must never break the page.
+    // Head-to-head match stats are optional (illustrative demo data); a failure
+    // must never break the page.
     getFixtureMatchStats(id)
       .then(setMatchStats)
       .catch(() => setMatchStats(null));

@@ -115,6 +115,33 @@ def test_prediction_endpoint_returns_expected_fields(client, monkeypatch):
     assert "confidence" in payload
 
 
+def test_prediction_endpoint_returns_advance_probability_for_knockout(client, monkeypatch):
+    knockout_fixture = {**FIXTURE, "stage": "Semi-final"}
+    monkeypatch.setattr(predictions_route.queries, "get_prediction_by_fixture_id", lambda fixture_id: None)
+    monkeypatch.setattr(predictions_route.queries, "get_fixture_by_id", lambda fixture_id: knockout_fixture)
+    monkeypatch.setattr(
+        predictions_route.queries,
+        "get_team_by_id",
+        lambda team_id: TEAM if team_id == 1 else AWAY_TEAM,
+    )
+
+    # Mimic the DB returning only stored columns — advance probabilities are
+    # derived, not persisted, so the route must carry them through itself.
+    def fake_insert(data):
+        return {k: v for k, v in data.items() if not k.endswith("advance_probability")}
+
+    monkeypatch.setattr(predictions_route.queries, "insert_prediction", fake_insert)
+
+    payload = client.get("/api/predictions/1").get_json()
+
+    assert payload["home_advance_probability"] is not None
+    assert payload["away_advance_probability"] is not None
+    # Advance probability folds in each side's shoot-out share of the draw, so it
+    # is never below the raw 90-minute win probability, and the two sides sum to 1.
+    assert payload["home_advance_probability"] >= payload["home_win_probability"]
+    assert round(payload["home_advance_probability"] + payload["away_advance_probability"], 6) == 1
+
+
 def test_custom_predict_endpoint(client, monkeypatch):
     monkeypatch.setattr(
         predictions_route.queries,

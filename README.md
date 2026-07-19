@@ -198,6 +198,15 @@ Open `http://localhost:5173/bracket` to view the dark sports-bracket layout. The
 
 The backend groups seeded knockout fixtures by stage, joins each fixture to its home and away teams, and attaches the latest prediction for that fixture. Advance probabilities are derived from the stored 90-minute win/draw/loss probabilities for knockout matches. The predicted winner is the team with the higher advance probability, falling back to the higher 90-minute win probability when advance values are unavailable.
 
+## Honest Demo Data (Option A)
+
+The seeded knockout bracket is **illustrative demo data**, not a live feed, and it is the **single source of truth** for every page. Two deliberate decisions keep it honest and internally consistent:
+
+- **One canonical fixtures table.** Both the Bracket (`GET /api/bracket`) and the Fixtures list (`GET /api/fixtures`) read the same seeded knockout set (scoped by the `Knockout bracket` / `World Cup 2026` markers in [`backend/app/db/queries.py`](backend/app/db/queries.py)). Because they read identical rows, the two views can never show different semi-final or final pairings. Each round's teams are chained forward from the previous round's actual-or-predicted winner (see [`backend/app/db/seed.py`](backend/app/db/seed.py)).
+- **No Wikipedia binding on synthetic fixtures.** Earlier builds fetched live Wikipedia match stats and bound them onto demo fixtures that don't correspond to real matches, which produced arbitrary results that disagreed with the bracket. That call path is disabled for the demo (`ENABLE_STATS_SYNC` defaults to `false`, and the Fixtures endpoint no longer triggers a Wikipedia refresh). Instead, completed-match scores and stats are **synthetic**, generated from the same Elo/Poisson model and team-strength inputs as the predictions, so scorelines are plausible and never contradict who advances. All such data is labelled `Illustrative demo data` in the UI — no Wikipedia attribution appears on synthetic content.
+
+To ingest **real** WC2026 results instead (Option B), point the results/stats sync at a live source and set `ENABLE_STATS_SYNC=true`.
+
 ## UI Theme And Animation
 
 The frontend uses a premium football broadcast theme with a dark stadium shell, deep pitch green tactical-board surfaces, subtle CSS pitch markings, white line accents, gold trophy highlights, and broadcast-style match tiles.

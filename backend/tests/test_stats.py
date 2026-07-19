@@ -261,7 +261,9 @@ def test_match_stats_endpoint_returns_shape(client, monkeypatch):
     body = response.get_json()
     assert body["home"]["team_name"] == "Brazil"
     assert body["away"]["goals_for"] == 1
-    assert "CC BY-SA" in body["source_note"]
+    # Honest-demo labelling: no Wikipedia attribution on synthetic demo data.
+    assert body["source"] == "Illustrative demo data"
+    assert "Wikipedia" not in body["source_note"]
 
 
 def test_match_stats_endpoint_null_when_none(client, monkeypatch):

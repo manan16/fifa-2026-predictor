@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface Props {
   /** Expected home goals (xG). */
@@ -41,6 +41,35 @@ export default function ScoreHeatmap({ homeXg, awayXg, homeCode = "HOME", awayCo
 
   const axes = Array.from({ length: size }, (_, i) => i);
 
+  // The grid is a square-celled block that can grow taller than the viewport.
+  // Rather than letting it clip silently, cap its height and scroll inside —
+  // surfacing a fade + hint only while there is genuinely more below.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => {
+      const scrollable = el.scrollHeight - el.clientHeight;
+      setOverflowing(scrollable > 1);
+      setAtBottom(scrollable - el.scrollTop <= 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [size, homeXg, awayXg]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setAtBottom(el.scrollHeight - el.clientHeight - el.scrollTop <= 1);
+  };
+
+  const showAffordance = overflowing && !atBottom;
+
   return (
     <div className="rounded border border-line bg-turf2/55 p-[18px]">
       <div className="mb-3 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-chalk-dim">
@@ -52,47 +81,63 @@ export default function ScoreHeatmap({ homeXg, awayXg, homeCode = "HOME", awayCo
         </span>
       </div>
 
-      <div
-        className="grid gap-[3px]"
-        style={{ gridTemplateColumns: `18px repeat(${size}, 1fr)` }}
-        role="img"
-        aria-label={`Most likely scoreline ${modal.h} to ${modal.a}`}
-      >
-        <div />
-        {axes.map((a) => (
-          <div key={`top-${a}`} className="grid place-items-center font-mono text-[9px] text-chalk-dim">
-            {a}
+      <div className="relative">
+        <div ref={scrollRef} onScroll={handleScroll} className="max-h-[56vh] overflow-y-auto overflow-x-hidden">
+          <div
+            className="grid gap-[3px]"
+            style={{ gridTemplateColumns: `18px repeat(${size}, 1fr)` }}
+            role="img"
+            aria-label={`Most likely scoreline ${modal.h} to ${modal.a}`}
+          >
+            <div />
+            {axes.map((a) => (
+              <div key={`top-${a}`} className="grid place-items-center font-mono text-[9px] text-chalk-dim">
+                {a}
+              </div>
+            ))}
+            {axes.map((h) => (
+              <div key={`row-${h}`} className="contents">
+                <div className="grid place-items-center font-mono text-[9px] text-chalk-dim">{h}</div>
+                {axes.map((a) => {
+                  const cell = cells[h * size + a];
+                  const t = cell.p / max;
+                  const isDiag = h === a;
+                  const isModal = h === modal.h && a === modal.a;
+                  return (
+                    <div
+                      key={`${h}-${a}`}
+                      className={`grid aspect-square place-items-center rounded-sm font-mono text-[9px] ${
+                        isModal
+                          ? "outline outline-2 -outline-offset-1 outline-gold"
+                          : isDiag
+                            ? "outline outline-1 -outline-offset-1 outline-sky/50"
+                            : ""
+                      }`}
+                      style={{
+                        background: `rgba(244,196,48,${(0.06 + t * 0.85).toFixed(3)})`,
+                        color: t > 0.35 ? "rgba(10,26,20,0.85)" : "transparent"
+                      }}
+                    >
+                      {t > 0.35 ? (cell.p * 100).toFixed(0) : ""}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
-        ))}
-        {axes.map((h) => (
-          <div key={`row-${h}`} className="contents">
-            <div className="grid place-items-center font-mono text-[9px] text-chalk-dim">{h}</div>
-            {axes.map((a) => {
-              const cell = cells[h * size + a];
-              const t = cell.p / max;
-              const isDiag = h === a;
-              const isModal = h === modal.h && a === modal.a;
-              return (
-                <div
-                  key={`${h}-${a}`}
-                  className={`grid aspect-square place-items-center rounded-sm font-mono text-[9px] ${
-                    isModal
-                      ? "outline outline-2 -outline-offset-1 outline-gold"
-                      : isDiag
-                        ? "outline outline-1 -outline-offset-1 outline-sky/50"
-                        : ""
-                  }`}
-                  style={{
-                    background: `rgba(244,196,48,${(0.06 + t * 0.85).toFixed(3)})`,
-                    color: t > 0.35 ? "rgba(10,26,20,0.85)" : "transparent"
-                  }}
-                >
-                  {t > 0.35 ? (cell.p * 100).toFixed(0) : ""}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+        </div>
+
+        {/* Scroll affordance: only while more of the grid remains below the fold. */}
+        <div
+          className={`pointer-events-none absolute inset-x-0 bottom-0 flex h-14 items-end justify-center bg-gradient-to-t from-turf2 to-transparent transition-opacity duration-300 ${
+            showAffordance ? "opacity-100" : "opacity-0"
+          }`}
+          aria-hidden="true"
+        >
+          <span className="mb-1 animate-bounce font-mono text-[9px] uppercase tracking-[0.14em] text-chalk-dim">
+            scroll for more ↓
+          </span>
+        </div>
       </div>
 
       <div className="mt-3 flex gap-4 font-mono text-[10px] uppercase tracking-[0.06em] text-chalk-dim">

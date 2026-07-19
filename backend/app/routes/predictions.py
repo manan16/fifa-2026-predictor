@@ -25,6 +25,15 @@ def get_prediction(fixture_id: int):
     away_team = queries.get_team_by_id(fixture["away_team_id"])
     prediction = predict_match(home_team, away_team, stage=fixture["stage"], neutral_venue=True)
     saved = queries.insert_prediction({"fixture_id": fixture_id, **prediction})
+    # insert_prediction returns raw prediction columns; advance probabilities are
+    # derived (knockout only) and not stored, so carry them through from the
+    # freshly computed prediction to match the stored-prediction path.
+    saved = {
+        **saved,
+        "stage": fixture["stage"],
+        "home_advance_probability": prediction.get("home_advance_probability"),
+        "away_advance_probability": prediction.get("away_advance_probability"),
+    }
     return jsonify(saved), 201
 
 

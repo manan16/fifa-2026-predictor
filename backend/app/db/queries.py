@@ -11,6 +11,13 @@ KNOCKOUT_STAGES = (
     "Final",
 )
 
+# The seeded knockout bracket is the single source of truth for every page. All
+# demo fixtures carry these markers (see app/db/seed.py); scoping both the
+# Fixtures list and the Bracket to them guarantees the two views can never
+# diverge, and keeps any stray real-data rows out of the illustrative demo.
+DEMO_FIXTURE_VENUE = "Knockout bracket"
+DEMO_FIXTURE_CITY = "World Cup 2026"
+
 PREDICTED_STATS_COLUMNS = (
     "expected_home_goals",
     "expected_away_goals",
@@ -176,9 +183,10 @@ def get_all_fixtures() -> list[dict[str, Any]]:
                 ORDER BY ps.created_at DESC, ps.id DESC
                 LIMIT 1
             ) ps ON true
-            WHERE f.result_source = 'wikipedia'
+            WHERE f.venue = %s AND f.city = %s
             ORDER BY f.kickoff_time, f.match_number;
-            """
+            """,
+            (DEMO_FIXTURE_VENUE, DEMO_FIXTURE_CITY),
         )
         return list(cur.fetchall())
 
@@ -344,6 +352,33 @@ def get_prediction_by_fixture_id(fixture_id: int) -> dict[str, Any] | None:
                 p.home_win_probability::float AS home_win_probability,
                 p.draw_probability::float AS draw_probability,
                 p.away_win_probability::float AS away_win_probability,
+                -- Advance probability folds each side's shoot-out share of the
+                -- draw onto its 90-minute win probability. Only meaningful for
+                -- knockout ties (NULL for the group stage), matching predict_match.
+                CASE
+                    WHEN LOWER(f.stage) = 'group'
+                        OR p.home_win_probability IS NULL
+                        OR p.away_win_probability IS NULL
+                        OR (p.home_win_probability + p.away_win_probability) = 0
+                    THEN NULL
+                    ELSE (
+                        p.home_win_probability
+                        + COALESCE(p.draw_probability, 0)
+                        * (p.home_win_probability / (p.home_win_probability + p.away_win_probability))
+                    )::float
+                END AS home_advance_probability,
+                CASE
+                    WHEN LOWER(f.stage) = 'group'
+                        OR p.home_win_probability IS NULL
+                        OR p.away_win_probability IS NULL
+                        OR (p.home_win_probability + p.away_win_probability) = 0
+                    THEN NULL
+                    ELSE (
+                        p.away_win_probability
+                        + COALESCE(p.draw_probability, 0)
+                        * (p.away_win_probability / (p.home_win_probability + p.away_win_probability))
+                    )::float
+                END AS away_advance_probability,
                 p.predicted_home_goals,
                 p.predicted_away_goals,
                 p.confidence,
@@ -496,6 +531,8 @@ def get_bracket_fixtures_with_odds_results() -> list[dict[str, Any]]:
             LEFT JOIN latest_consensus lc ON lc.fixture_id = f.id
             LEFT JOIN latest_stats ps ON ps.fixture_id = f.id
             WHERE f.stage = ANY(%s)
+              AND f.venue = %s
+              AND f.city = %s
             ORDER BY
                 CASE f.stage
                     WHEN 'Round of 32' THEN 1
@@ -507,7 +544,7 @@ def get_bracket_fixtures_with_odds_results() -> list[dict[str, Any]]:
                 END,
                 f.match_number;
             """,
-            (list(KNOCKOUT_STAGES),),
+            (list(KNOCKOUT_STAGES), DEMO_FIXTURE_VENUE, DEMO_FIXTURE_CITY),
         )
         return list(cur.fetchall())
 
