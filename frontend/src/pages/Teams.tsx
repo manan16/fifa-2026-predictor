@@ -15,7 +15,8 @@ export default function Teams() {
   }, []);
 
   const { ranked, scale } = useMemo(() => {
-    const sorted = [...teams].sort((a, b) => b.elo_rating - a.elo_rating);
+    const byFifa = (t: Team) => t.fifa_ranking ?? Number.POSITIVE_INFINITY;
+    const sorted = [...teams].sort((a, b) => byFifa(a) - byFifa(b));
     const elos = sorted.map((t) => t.elo_rating);
     const max = Math.max(...elos, 1);
     const min = Math.min(...elos, 0);

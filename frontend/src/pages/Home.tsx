@@ -23,6 +23,17 @@ function winnerCode(f: BracketFixture): string {
   return homeAdv >= awayAdv ? f.home_team_code : f.away_team_code;
 }
 
+// Order a round's fixtures so consecutive pairs line up with the slot they feed
+// in the next round. The bracket alternates Left/Right by match_number within a
+// round but groups Left-then-Right between rounds, so sort by group first
+// (Left before Right), then by match_number. Unknown/null groups fall through
+// to rank 2 so partial/empty bracket data never throws.
+function bracketOrder(f: BracketFixture): number {
+  const group = (f.group_name ?? "").toLowerCase();
+  const groupRank = group.includes("left") ? 0 : group.includes("right") ? 1 : 2;
+  return groupRank * 1000 + f.match_number;
+}
+
 const pillars = [
   {
     accent: "border-t-gold",
@@ -65,7 +76,12 @@ export default function Home() {
 
   const funnel = useMemo(() => {
     const rows = [bracket.round_of_16, bracket.quarter_finals, bracket.semi_finals]
-      .map((round) => round.map(winnerCode).filter(Boolean))
+      .map((round) =>
+        [...round]
+          .sort((a, b) => bracketOrder(a) - bracketOrder(b))
+          .map(winnerCode)
+          .filter(Boolean)
+      )
       .filter((row) => row.length > 0);
     const champion =
       bracket.final[0] != null

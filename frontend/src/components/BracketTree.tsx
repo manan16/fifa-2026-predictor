@@ -78,21 +78,34 @@ export function Tie({ f, delay = 0 }: { f: BracketFixture; delay?: number }) {
   );
 }
 
-function Column({ label, ties, justify, delayBase }: {
-  label: string;
+// Pin each tie to the 8-row coordinate system the CONNECTORS array assumes:
+// span=2 (R16) → centers at 12.5/37.5/62.5/87.5%, span=4 (QF) → 25/75%,
+// span=8 (SF) → 50%. Content is centered within its row span so extra-height
+// cards (e.g. a "market disagrees" badge) grow around the center, not off it.
+function Column({ ties, span, delayBase }: {
   ties: BracketFixture[];
-  justify: string;
+  span: number;
   delayBase: number;
 }) {
   return (
-    <div className={`z-10 flex flex-col px-1.5 ${justify}`}>
-      <div className="mb-1.5 text-center font-mono text-[9px] uppercase tracking-[0.12em] text-chalk-dim">{label}</div>
+    <div className="z-10 grid px-1.5" style={{ gridTemplateRows: "repeat(8, 1fr)" }}>
       {ties.map((f, i) => (
-        <Tie key={f.id} f={f} delay={delayBase + i * 0.08} />
+        <div
+          key={f.id}
+          className="flex flex-col justify-center"
+          style={{ gridRow: `${i * span + 1} / span ${span}` }}
+        >
+          <Tie f={f} delay={delayBase + i * 0.08} />
+        </div>
       ))}
     </div>
   );
 }
+
+// Round labels rendered in a separate header row (one per grid column) so their
+// height can never shift the tie vertical positions below. Index 3 (champion
+// column) is intentionally blank.
+const ROUND_LABELS = ["Round of 16", "Quarter", "Semi", "", "Semi", "Quarter", "Round of 16"];
 
 // Elbow connectors generated for the symmetric 4→2→1 tree (viewBox 0..100).
 const CONNECTORS = [
@@ -148,47 +161,59 @@ export default function BracketTree({ bracket }: { bracket: BracketResponse }) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="relative grid min-h-[460px] min-w-[860px] grid-cols-7">
-        <svg
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          aria-hidden="true"
-        >
-          {CONNECTORS.map((c, i) => (
-            <path
+      <div className="min-w-[860px]">
+        <div className="grid grid-cols-7">
+          {ROUND_LABELS.map((label, i) => (
+            <div
               key={i}
-              data-chalk
-              d={c.d}
-              fill="none"
-              stroke="#ecf4ed"
-              strokeWidth={0.35}
-              opacity={0.2}
-              className="animate-chalk-draw"
-              style={{ strokeDasharray: 60, strokeDashoffset: 60, animationDelay: `${0.2 + c.band * 0.3}s` }}
-            />
-          ))}
-        </svg>
-
-        <Column label="Round of 16" ties={r16L} justify="justify-around" delayBase={0.1} />
-        <Column label="Quarter" ties={qfL} justify="justify-around" delayBase={0.3} />
-        <Column label="Semi" ties={sfL} justify="justify-center" delayBase={0.5} />
-        <div className="z-10 flex flex-col items-center justify-center px-1.5">
-          {championCode && (
-            <div className="text-center">
-              <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.16em] text-gold">
-                Predicted champion
-              </span>
-              <span className="animate-ignite inline-block" style={{ animationDelay: "1.1s" }}>
-                <CrestPip code={championCode} variant="gold" className="mx-auto h-[74px] w-16 text-lg" />
-              </span>
-              <div className="mt-2.5 font-display text-lg font-extrabold uppercase text-chalk">{championName}</div>
+              className="px-1.5 pb-1.5 text-center font-mono text-[9px] uppercase tracking-[0.12em] text-chalk-dim"
+            >
+              {label}
             </div>
-          )}
+          ))}
         </div>
-        <Column label="Semi" ties={sfR} justify="justify-center" delayBase={0.5} />
-        <Column label="Quarter" ties={qfR} justify="justify-around" delayBase={0.3} />
-        <Column label="Round of 16" ties={r16R} justify="justify-around" delayBase={0.1} />
+        <div className="relative grid min-h-[460px] grid-cols-7">
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            aria-hidden="true"
+          >
+            {CONNECTORS.map((c, i) => (
+              <path
+                key={i}
+                data-chalk
+                d={c.d}
+                fill="none"
+                stroke="#ecf4ed"
+                strokeWidth={0.35}
+                opacity={0.2}
+                className="animate-chalk-draw"
+                style={{ strokeDasharray: 60, strokeDashoffset: 60, animationDelay: `${0.2 + c.band * 0.3}s` }}
+              />
+            ))}
+          </svg>
+
+          <Column ties={r16L} span={2} delayBase={0.1} />
+          <Column ties={qfL} span={4} delayBase={0.3} />
+          <Column ties={sfL} span={8} delayBase={0.5} />
+          <div className="z-10 flex flex-col items-center justify-center px-1.5">
+            {championCode && (
+              <div className="text-center">
+                <span className="mb-2 block font-mono text-[9px] uppercase tracking-[0.16em] text-gold">
+                  Predicted champion
+                </span>
+                <span className="animate-ignite inline-block" style={{ animationDelay: "1.1s" }}>
+                  <CrestPip code={championCode} variant="gold" className="mx-auto h-[74px] w-16 text-lg" />
+                </span>
+                <div className="mt-2.5 font-display text-lg font-extrabold uppercase text-chalk">{championName}</div>
+              </div>
+            )}
+          </div>
+          <Column ties={sfR} span={8} delayBase={0.5} />
+          <Column ties={qfR} span={4} delayBase={0.3} />
+          <Column ties={r16R} span={2} delayBase={0.1} />
+        </div>
       </div>
     </div>
   );

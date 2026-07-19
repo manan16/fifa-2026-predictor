@@ -1,6 +1,6 @@
 # FIFA 2026 Knockout Predictor
 
-![Screenshot placeholder](docs/screenshot-placeholder.svg)
+![Match Night — the knockout desk](docs/images/home.png)
 
 Portfolio-quality MVP for predicting FIFA World Cup 2026 knockout-stage outcomes with a Flask API, PostgreSQL, raw SQL migrations, psycopg 3, and a React analytics dashboard.
 
@@ -30,6 +30,30 @@ Portfolio-quality MVP for predicting FIFA World Cup 2026 knockout-stage outcomes
 - Full-screen Match Centre dashboard with featured fixture, model-vs-market analytics, and wide data layouts
 - Backend pytest coverage for routes and model probabilities
 
+## Screenshots
+
+All screenshots use the seeded illustrative demo data. Live under `docs/images/`.
+
+**Predicted bracket — chained from Round of 32 to the trophy**
+
+![Predicted bracket](docs/images/bracket.png)
+
+**Match Centre — model vs market call, predicted and actual result**
+
+![Match Centre](docs/images/match-centre.png)
+
+**Fixtures — every tie with the desk's pick and the market line**
+
+![Fixtures](docs/images/fixtures.png)
+
+**The Model — transparent Elo + Poisson pipeline with a Dixon-Coles score grid**
+
+![The Model](docs/images/model.png)
+
+**Power ranking — blended Elo and FIFA ranking, by nation**
+
+![Power ranking](docs/images/teams.png)
+
 ## Repository Structure
 
 ```text
@@ -47,6 +71,8 @@ fifa-2026-predictor/
       services/
       types/
   data/
+  docs/
+    images/          # README screenshots
   notebooks/
   docker-compose.yml
   Makefile
@@ -72,23 +98,77 @@ make frontend
 
 Open `http://localhost:5173`. The backend runs at `http://localhost:9000`.
 
-## Local Setup With Docker
+## Build And Run With Docker
+
+The fastest way to run the whole stack (PostgreSQL + Flask backend + React frontend) is Docker Compose. It builds the backend and frontend images, starts PostgreSQL, runs migrations and the seed script, then serves the apps.
+
+### Prerequisites
+
+- Docker Engine 24+ and the Docker Compose plugin (`docker compose version`)
+- Ports `5173`, `9000`, and `5432` free on your machine
+
+### 1. Configure environment
 
 ```bash
 cp .env.example .env
-make docker-up
 ```
 
-Docker starts PostgreSQL, runs migrations and seed data, then serves:
+The defaults work out of the box. `ODDS_API_KEY`/`RESULTS_API_KEY` are optional — without them the app uses illustrative demo odds and synthetic results.
 
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:9000`
-- PostgreSQL: `localhost:5432`
-
-Stop containers with:
+### 2. Build the images
 
 ```bash
-make docker-down
+docker compose build
+```
+
+This builds two images from their Dockerfiles:
+
+- `backend/Dockerfile` — `python:3.11-slim`, installs `requirements.txt`, exposes `9000`
+- `frontend/Dockerfile` — `node:20-slim`, installs npm deps, runs the Vite dev server on `5173`
+
+### 3. Run the stack
+
+```bash
+docker compose up
+```
+
+Add `-d` to run detached, or `docker compose up --build` to rebuild and run in one step (this is what `make docker-up` does). On start, the backend container runs `python -m app.db.migrate && python -m app.db.seed && python run.py`, so the database is migrated and seeded automatically.
+
+Services once healthy:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:9000` (health check: `http://localhost:9000/health`)
+- PostgreSQL: `localhost:5432` (`fifa_user` / `fifa_password` / `fifa_predictor`)
+
+### 4. Stop and clean up
+
+```bash
+docker compose down          # stop containers (keeps the postgres volume)
+docker compose down -v       # also remove the postgres_data volume for a clean slate
+```
+
+`make docker-down` is a shortcut for `docker compose down`.
+
+### Building a single image
+
+The backend and frontend images can also be built and tagged independently:
+
+```bash
+docker build -t match-night-backend ./backend
+docker build -t match-night-frontend ./frontend
+```
+
+Note that the backend image needs a reachable PostgreSQL instance (via `DATABASE_URL`) to run migrations and serve requests — Compose wires this up for you, so prefer `docker compose` for local development.
+
+## Local Setup With Docker (shortcut)
+
+If you have the Makefile targets, the same flow is:
+
+```bash
+cp .env.example .env
+make docker-up     # docker compose up --build
+# ...
+make docker-down   # docker compose down
 ```
 
 ## GitHub Pages Deployment
